@@ -3,10 +3,27 @@ import 'package:http/http.dart' as http;
 import '../../../core/constants/api_constants.dart';
 
 class AuthApi {
-  static Future<bool> login(String email, String password) async {
-    print("➡️ [AuthApi] LOGIN called");
-    print("📧 Email: $email");
+  static Future<Map<String, dynamic>?> verifySession(String token) async {
+    try {
+      final res = await http.get(
+        Uri.parse("${ApiConstants.baseUrl}/verify"),
+        headers: {"Authorization": "Bearer $token"},
+      );
 
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      }
+      return null;
+    } catch (e) {
+      print("❌ Verify session error: $e");
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>?> login(
+    String email,
+    String password,
+  ) async {
     try {
       final res = await http.post(
         Uri.parse("${ApiConstants.baseUrl}/login"),
@@ -14,13 +31,13 @@ class AuthApi {
         body: jsonEncode({"email": email, "password": password}),
       );
 
-      print("⬅️ [AuthApi] LOGIN response code: ${res.statusCode}");
-      print("📦 Response body: ${res.body}");
-
-      return res.statusCode == 200;
+      if (res.statusCode == 200) {
+        return jsonDecode(res.body);
+      }
+      return null;
     } catch (e) {
-      print("❌ [AuthApi] LOGIN exception: $e");
-      return false;
+      print("❌ Login API error: $e");
+      return null;
     }
   }
 
