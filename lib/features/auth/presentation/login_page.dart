@@ -31,21 +31,16 @@ class _LoginPageState extends State<LoginPage> {
       print("🟢 [LoginPage] Login result: $result");
 
       if (result != null) {
-        await SessionManager.saveSession(
-          result["token"],
-          result["email"],
-        );
+        await SessionManager.saveSession(result["token"], result["userId"]);
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (_) => HomePage(email: result["email"]),
-          ),
+          MaterialPageRoute(builder: (_) => HomePage(userId: result["userId"])),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Login Failed")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Login Failed")));
       }
     } catch (e) {
       print("❌ [LoginPage] Exception: $e");
@@ -74,10 +69,7 @@ class _LoginPageState extends State<LoginPage> {
             const SizedBox(height: 20),
             loading
                 ? const CircularProgressIndicator()
-                : ElevatedButton(
-                    onPressed: login,
-                    child: const Text("Login"),
-                  ),
+                : ElevatedButton(onPressed: login, child: const Text("Login")),
             TextButton(
               onPressed: () {
                 Navigator.push(

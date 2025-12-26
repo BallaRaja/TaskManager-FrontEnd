@@ -1,3 +1,4 @@
+import 'package:client/features/auth/presentation/login_page.dart';
 import 'package:client/features/home/presentation/home_page.dart';
 import 'package:flutter/material.dart';
 import '../logic/auth_controller.dart';
@@ -31,13 +32,15 @@ class _RegisterPageState extends State<RegisterPage> {
       print("🟢 [RegisterPage] Register success: $success");
 
       if (success) {
-        await SessionManager.saveEmail(emailController.text);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Registration successful. Please login."),
+          ),
+        );
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (_) => HomePage(email: emailController.text),
-          ),
+          MaterialPageRoute(builder: (_) => const LoginPage()),
         );
       } else {
         ScaffoldMessenger.of(

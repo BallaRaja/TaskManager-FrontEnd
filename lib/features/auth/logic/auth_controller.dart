@@ -1,18 +1,15 @@
 import '../data/auth_api.dart';
-import '../data/auth_api.dart';
 
 class AuthController {
-  Future<Map<String, dynamic>?> login(String email, String password) {
+
+  /// 🔐 Login → returns { token, userId }
+  Future<Map<String, dynamic>?> login(
+      String email, String password) {
+    print("➡️ [AuthController] login()");
     return AuthApi.login(email, password);
   }
 
-  // Future<bool> login(String email, String password) async {
-  //   print("➡️ [AuthController] login()");
-  //   final result = await AuthApi.login(email, password);
-  //   print("⬅️ [AuthController] login result: $result");
-  //   return result;
-  // }
-
+  /// 📝 Register user
   Future<bool> register(String email, String password) async {
     print("➡️ [AuthController] register()");
     final result = await AuthApi.register(email, password);
