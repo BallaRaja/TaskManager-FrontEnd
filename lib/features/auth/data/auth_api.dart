@@ -82,7 +82,8 @@ class AuthApi {
       print("⬅️ [AuthApi] REGISTER response code: ${res.statusCode}");
       print("📦 Response body: ${res.body}");
 
-      return res.statusCode == 200;
+      // ✅ ACCEPT 201 (Created)
+      return res.statusCode == 201;
     } catch (e) {
       print("❌ [AuthApi] REGISTER exception: $e");
       return false;

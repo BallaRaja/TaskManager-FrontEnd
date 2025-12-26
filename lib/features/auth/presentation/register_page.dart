@@ -1,8 +1,6 @@
 import 'package:client/features/auth/presentation/login_page.dart';
-import 'package:client/features/home/presentation/home_page.dart';
 import 'package:flutter/material.dart';
 import '../logic/auth_controller.dart';
-import '../../../core/utils/session_manager.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
