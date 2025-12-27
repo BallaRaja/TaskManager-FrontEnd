@@ -1,8 +1,66 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+import '../../../core/constants/api_constants.dart';
+import '../../../core/utils/session_manager.dart';
 import '../../profile/presentation/profile_sheet.dart';
 
-class TasksPage extends StatelessWidget {
+class TasksPage extends StatefulWidget {
   const TasksPage({super.key});
+
+  @override
+  State<TasksPage> createState() => _TasksPageState();
+}
+
+class _TasksPageState extends State<TasksPage> {
+  String? _avatarUrl; // Will hold the avatar from API
+  bool _isLoadingAvatar = true; // Show loading until we fetch it
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchProfileAvatar();
+  }
+
+  Future<void> _fetchProfileAvatar() async {
+    final token = await SessionManager.getToken();
+    final userId = await SessionManager.getUserId();
+
+    if (token == null || userId == null) {
+      setState(() {
+        _isLoadingAvatar = false;
+      });
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse("${ApiConstants.backendUrl}/api/profile/$userId"),
+        headers: {"Authorization": "Bearer $token"},
+      );
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        final String? avatar = json["data"]?["profile"]?["avatarUrl"];
+
+        if (mounted) {
+          setState(() {
+            _avatarUrl = avatar;
+            _isLoadingAvatar = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() => _isLoadingAvatar = false);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingAvatar = false);
+      }
+    }
+  }
 
   void _showProfileSheet(BuildContext context) {
     showGeneralDialog(
@@ -14,8 +72,10 @@ class TasksPage extends StatelessWidget {
       pageBuilder: (context, anim1, anim2) => const ProfileSheet(),
       transitionBuilder: (context, anim1, anim2, child) {
         return SlideTransition(
-          position: Tween(begin: const Offset(1, 0), end: const Offset(0, 0))
-              .animate(CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
+          position: Tween(
+            begin: const Offset(1, 0),
+            end: const Offset(0, 0),
+          ).animate(CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
           child: child,
         );
       },
@@ -36,11 +96,46 @@ class TasksPage extends StatelessWidget {
             padding: const EdgeInsets.only(right: 16),
             child: GestureDetector(
               onTap: () => _showProfileSheet(context),
-              child: const CircleAvatar(
+              child: CircleAvatar(
                 radius: 18,
-                backgroundImage: NetworkImage(
-                  "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=987&q=80",
-                ),
+                backgroundColor: Colors.grey[300],
+                child: _isLoadingAvatar
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : _avatarUrl != null && _avatarUrl!.isNotEmpty
+                    ? ClipOval(
+                        child: Image.network(
+                          _avatarUrl!,
+                          fit: BoxFit.cover,
+                          width: 36,
+                          height: 36,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(
+                              Icons.person,
+                              size: 24,
+                              color: Colors.grey,
+                            );
+                          },
+                        ),
+                      )
+                    : const Icon(Icons.person, size: 24, color: Colors.grey),
               ),
             ),
           ),

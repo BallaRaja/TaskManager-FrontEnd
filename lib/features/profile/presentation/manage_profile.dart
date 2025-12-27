@@ -23,10 +23,13 @@ class _ManageProfilePageState extends State<ManageProfilePage> {
   bool _isLoading = false;
   String? _avatarPreviewUrl;
 
+  // Store original email to send it back unchanged
+  late String _originalEmail;
+
   @override
   void initState() {
     super.initState();
-    final profile = widget.profileData["profile"];
+    final profile = widget.profileData["profile"] ?? {};
 
     _nameController = TextEditingController(text: profile["fullName"] ?? "");
     _bioController = TextEditingController(text: profile["bio"] ?? "");
@@ -34,7 +37,10 @@ class _ManageProfilePageState extends State<ManageProfilePage> {
       text: profile["avatarUrl"] ?? "",
     );
 
-    // Initial preview
+    // Store original email
+    _originalEmail = (profile["email"] as String?)?.trim() ?? "";
+
+    // Initial avatar preview
     _avatarPreviewUrl = profile["avatarUrl"]?.toString().isNotEmpty == true
         ? profile["avatarUrl"]
         : null;
@@ -65,6 +71,7 @@ class _ManageProfilePageState extends State<ManageProfilePage> {
       "profile": {
         "fullName": _nameController.text.trim(),
         "bio": _bioController.text.trim(),
+        "email": _originalEmail, // ← Always include the current email
         if (_avatarUrlController.text.trim().isNotEmpty)
           "avatarUrl": _avatarUrlController.text.trim(),
       },
@@ -94,7 +101,7 @@ class _ManageProfilePageState extends State<ManageProfilePage> {
         );
 
         if (mounted) {
-          Navigator.pop(context, true); // Signal success back to ProfileSheet
+          Navigator.pop(context, true); // Signal success back to caller
         }
       } else {
         final errorMsg =
@@ -120,8 +127,8 @@ class _ManageProfilePageState extends State<ManageProfilePage> {
         ? const Color(0xFF171022)
         : const Color(0xFFF5F5F5);
 
-    final profile = widget.profileData["profile"];
-    final currentEmail = profile["email"] ?? "No email";
+    final profile = widget.profileData["profile"] ?? {};
+    final currentEmail = _originalEmail.isNotEmpty ? _originalEmail : "Not set";
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -139,166 +146,199 @@ class _ManageProfilePageState extends State<ManageProfilePage> {
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            const SizedBox(height: 20),
-
-            // Large Avatar Preview
-            Center(
-              child: CircleAvatar(
-                radius: 80,
-                backgroundImage:
-                    _avatarPreviewUrl != null && _avatarPreviewUrl!.isNotEmpty
-                    ? NetworkImage(_avatarPreviewUrl!)
-                    : null,
-                backgroundColor: Colors.grey[300],
-                child: _avatarPreviewUrl == null || _avatarPreviewUrl!.isEmpty
-                    ? Icon(Icons.person, size: 100, color: Colors.grey[600])
-                    : null,
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            Text(
-              "Tap below to change avatar URL",
-              style: TextStyle(color: Colors.grey[600], fontSize: 14),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Avatar URL Input
-            TextField(
-              controller: _avatarUrlController,
-              decoration: InputDecoration(
-                labelText: "Avatar Image URL",
-                hintText: "https://example.com/your-photo.jpg",
-                prefixIcon: const Icon(Icons.link),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                filled: true,
-                fillColor: isDark ? Colors.grey[850] : Colors.white,
-              ),
-              keyboardType: TextInputType.url,
-              onChanged: (value) {
-                setState(() {
-                  _avatarPreviewUrl = value.trim().isNotEmpty
-                      ? value.trim()
-                      : null;
-                });
-              },
-            ),
-
-            const SizedBox(height: 32),
-
-            // Full Name
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                labelText: "Full Name",
-                prefixIcon: const Icon(Icons.person_outline),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                filled: true,
-                fillColor: isDark ? Colors.grey[850] : Colors.white,
-              ),
-              textCapitalization: TextCapitalization.words,
-            ),
-
-            const SizedBox(height: 24),
-
-            // Locked Email Display
-            Container(
+            // === BIG SQUARE AVATAR SECTION ===
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.45,
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.grey[900] : Colors.grey[100],
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey[400]!),
-              ),
-              child: Row(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.email_outlined, color: Colors.grey[600]),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Email",
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          currentEmail,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: isDark ? Colors.grey[300] : Colors.grey[800],
-                          ),
-                        ),
-                      ],
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16), // slight rounding
+                    child: Container(
+                      width: MediaQuery.of(context).size.width * 0.72,
+                      height: MediaQuery.of(context).size.width * 0.72,
+                      decoration: BoxDecoration(color: Colors.grey[300]),
+                      child:
+                          _avatarPreviewUrl != null &&
+                              _avatarPreviewUrl!.isNotEmpty
+                          ? Image.network(
+                              _avatarPreviewUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const Icon(
+                                    Icons.broken_image,
+                                    size: 90,
+                                    color: Colors.grey,
+                                  ),
+                            )
+                          : const Icon(
+                              Icons.person,
+                              size: 140,
+                              color: Colors.grey,
+                            ),
                     ),
                   ),
-                  Icon(Icons.lock_outline, color: Colors.grey[500], size: 20),
+                  const SizedBox(height: 20),
+                  Text(
+                    "Change your avatar by entering a new image URL below",
+                    style: TextStyle(color: Colors.grey[600], fontSize: 15),
+                  ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 24),
-
-            // Bio
-            TextField(
-              controller: _bioController,
-              decoration: InputDecoration(
-                labelText: "Bio (optional)",
-                hintText: "Tell us about yourself...",
-                prefixIcon: const Icon(Icons.short_text),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                filled: true,
-                fillColor: isDark ? Colors.grey[850] : Colors.white,
-              ),
-              maxLines: 5,
-              maxLength: 200,
-            ),
-
-            const SizedBox(height: 48),
-
-            // Save Button - Full width & prominent
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _saveChanges,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.purple[600],
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  elevation: 2,
-                ),
-                child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        "Save Changes",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+            // === Form Fields ===
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Avatar URL Input
+                  TextField(
+                    controller: _avatarUrlController,
+                    decoration: InputDecoration(
+                      labelText: "Avatar Image URL",
+                      hintText: "https://example.com/your-photo.jpg",
+                      prefixIcon: const Icon(Icons.link),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
+                      filled: true,
+                      fillColor: isDark ? Colors.grey[850] : Colors.white,
+                    ),
+                    keyboardType: TextInputType.url,
+                    onChanged: (value) {
+                      setState(() {
+                        _avatarPreviewUrl = value.trim().isNotEmpty
+                            ? value.trim()
+                            : null;
+                      });
+                    },
+                  ),
+
+                  const SizedBox(height: 32),
+
+                  // Full Name
+                  TextField(
+                    controller: _nameController,
+                    decoration: InputDecoration(
+                      labelText: "Full Name",
+                      prefixIcon: const Icon(Icons.person_outline),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      filled: true,
+                      fillColor: isDark ? Colors.grey[850] : Colors.white,
+                    ),
+                    textCapitalization: TextCapitalization.words,
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Locked Email Display
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 20,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.grey[900] : Colors.grey[100],
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.grey[400]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.email_outlined, color: Colors.grey[600]),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Email",
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                currentEmail,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: isDark
+                                      ? Colors.grey[300]
+                                      : Colors.grey[800],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.lock_outline,
+                          color: Colors.grey[500],
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Bio
+                  TextField(
+                    controller: _bioController,
+                    decoration: InputDecoration(
+                      labelText: "Bio (optional)",
+                      hintText: "Tell us about yourself...",
+                      prefixIcon: const Icon(Icons.short_text),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      filled: true,
+                      fillColor: isDark ? Colors.grey[850] : Colors.white,
+                    ),
+                    maxLines: 5,
+                    maxLength: 200,
+                  ),
+
+                  const SizedBox(height: 48),
+
+                  // Save Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _saveChanges,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.purple[600],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        elevation: 2,
+                      ),
+                      child: _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              "Save Changes",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 40),
+                ],
               ),
             ),
-
-            const SizedBox(height: 40), // Extra bottom space
           ],
         ),
       ),
