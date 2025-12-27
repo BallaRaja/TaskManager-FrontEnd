@@ -1,66 +1,16 @@
+// lib/features/tasks/presentation/tasks_page.dart
+
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:provider/provider.dart';
 
-import '../../../core/constants/api_constants.dart';
-import '../../../core/utils/session_manager.dart';
 import '../../profile/presentation/profile_sheet.dart';
+import 'tasks_controller.dart';
+import 'widgets/task_list_tab.dart';
+import 'widgets/task_item.dart';
+import 'widgets/completed_section.dart';
 
-class TasksPage extends StatefulWidget {
+class TasksPage extends StatelessWidget {
   const TasksPage({super.key});
-
-  @override
-  State<TasksPage> createState() => _TasksPageState();
-}
-
-class _TasksPageState extends State<TasksPage> {
-  String? _avatarUrl; // Will hold the avatar from API
-  bool _isLoadingAvatar = true; // Show loading until we fetch it
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchProfileAvatar();
-  }
-
-  Future<void> _fetchProfileAvatar() async {
-    final token = await SessionManager.getToken();
-    final userId = await SessionManager.getUserId();
-
-    if (token == null || userId == null) {
-      setState(() {
-        _isLoadingAvatar = false;
-      });
-      return;
-    }
-
-    try {
-      final response = await http.get(
-        Uri.parse("${ApiConstants.backendUrl}/api/profile/$userId"),
-        headers: {"Authorization": "Bearer $token"},
-      );
-
-      if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        final String? avatar = json["data"]?["profile"]?["avatarUrl"];
-
-        if (mounted) {
-          setState(() {
-            _avatarUrl = avatar;
-            _isLoadingAvatar = false;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() => _isLoadingAvatar = false);
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingAvatar = false);
-      }
-    }
-  }
 
   void _showProfileSheet(BuildContext context) {
     showGeneralDialog(
@@ -69,13 +19,13 @@ class _TasksPageState extends State<TasksPage> {
       barrierLabel: "Dismiss",
       barrierColor: Colors.black.withOpacity(0.5),
       transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (context, anim1, anim2) => const ProfileSheet(),
-      transitionBuilder: (context, anim1, anim2, child) {
+      pageBuilder: (_, __, ___) => const ProfileSheet(),
+      transitionBuilder: (_, anim, __, child) {
         return SlideTransition(
           position: Tween(
             begin: const Offset(1, 0),
-            end: const Offset(0, 0),
-          ).animate(CurvedAnimation(parent: anim1, curve: Curves.easeOutCubic)),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
           child: child,
         );
       },
@@ -84,71 +34,129 @@ class _TasksPageState extends State<TasksPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          "My Tasks",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: GestureDetector(
-              onTap: () => _showProfileSheet(context),
-              child: CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.grey[300],
-                child: _isLoadingAvatar
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : _avatarUrl != null && _avatarUrl!.isNotEmpty
-                    ? ClipOval(
-                        child: Image.network(
-                          _avatarUrl!,
-                          fit: BoxFit.cover,
-                          width: 36,
-                          height: 36,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(
-                              Icons.person,
-                              size: 24,
-                              color: Colors.grey,
-                            );
-                          },
-                        ),
-                      )
-                    : const Icon(Icons.person, size: 24, color: Colors.grey),
+    return ChangeNotifierProvider(
+      create: (_) => TasksController()..init(),
+      child: Consumer<TasksController>(
+        builder: (context, controller, _) {
+          if (controller.isLoading) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final currentList = controller.taskLists.isEmpty
+              ? null
+              : controller.taskLists[controller.selectedListIndex];
+          final listTaskIds = currentList?["taskIds"] as List<dynamic>? ?? [];
+
+          final displayedTasks = controller.tasks.where((task) {
+            if (currentList?["isDefault"] == true || listTaskIds.isEmpty) {
+              return true;
+            }
+            return listTaskIds.contains(task["_id"]);
+          }).toList();
+
+          final pending = displayedTasks
+              .where((t) => t["status"] == "pending")
+              .toList();
+          final completed = displayedTasks
+              .where((t) => t["status"] == "completed")
+              .toList();
+
+          return Scaffold(
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            appBar: PreferredSize(
+              preferredSize: const Size.fromHeight(100),
+              child: AppBar(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                leading: IconButton(
+                  icon: const Icon(Icons.menu),
+                  onPressed: () {},
+                ),
+                title: const Text(
+                  "Tasks",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                ),
+                centerTitle: true,
+                actions: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 16),
+                    child: GestureDetector(
+                      onTap: () => _showProfileSheet(context),
+                      child: CircleAvatar(
+                        radius: 18,
+                        backgroundColor: Colors.grey.shade200,
+                        backgroundImage:
+                            controller.avatarUrl?.isNotEmpty == true
+                            ? NetworkImage(controller.avatarUrl!)
+                            : null,
+                        child: controller.isLoadingAvatar
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : controller.avatarUrl?.isNotEmpty == true
+                            ? null
+                            : const Icon(Icons.person),
+                      ),
+                    ),
+                  ),
+                ],
+                bottom: PreferredSize(
+                  preferredSize: const Size.fromHeight(50),
+                  child: _buildTabBar(context, controller),
+                ),
               ),
             ),
+            body: RefreshIndicator(
+              onRefresh: controller.refresh,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                children: [
+                  ...pending.map((t) => TaskItem(task: t, isCompleted: false)),
+                  const SizedBox(height: 32),
+                  CompletedSection(completedTasks: completed),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+            floatingActionButton: FloatingActionButton(
+              shape: const CircleBorder(),
+              backgroundColor: Colors.purple,
+              onPressed: () => print("Add task"),
+              child: const Icon(Icons.add, color: Colors.white, size: 32),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildTabBar(BuildContext context, TasksController controller) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          ...controller.taskLists.asMap().entries.map((e) {
+            return GestureDetector(
+              onTap: () => controller.selectList(e.key),
+              child: TaskListTab(
+                title: e.value["title"] ?? "Untitled",
+                isActive: e.key == controller.selectedListIndex,
+              ),
+            );
+          }),
+          const SizedBox(width: 20),
+          GestureDetector(
+            onTap: () => print("Add new list"),
+            child: const TaskListTab(title: "Add new list", isAddButton: true),
           ),
         ],
-        elevation: 0,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      ),
-      body: const Center(
-        child: Text(
-          "📋 Your Tasks Will Appear Here\nComing soon!",
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 20, color: Colors.grey),
-        ),
       ),
     );
   }
