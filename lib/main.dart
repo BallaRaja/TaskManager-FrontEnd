@@ -128,7 +128,7 @@ class _MainAppShellState extends State<MainAppShell> {
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
         selectedItemColor: Theme.of(context).primaryColor,
-        unselectedItemColor: Colors.grey,
+        unselectedItemColor: const Color.fromARGB(255, 158, 158, 158),
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.checklist), label: 'Tasks'),
           BottomNavigationBarItem(icon: Icon(Icons.auto_awesome), label: 'AI'),
