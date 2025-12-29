@@ -70,6 +70,33 @@ class TasksController extends ChangeNotifier {
     }
   }
 
+  // In TasksController class
+
+  Future<void> createTask(Map<String, dynamic> taskData) async {
+    try {
+      final token = await SessionManager.getToken();
+      if (token == null) return;
+
+      final response = await http.post(
+        Uri.parse("${ApiConstants.backendUrl}/api/task"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode(taskData),
+      );
+
+      if (response.statusCode == 201) {
+        await _fetchTasks(); // Refresh tasks
+        notifyListeners();
+      } else {
+        print("Failed to create task: ${response.body}");
+      }
+    } catch (e) {
+      print("Error creating task: $e");
+    }
+  }
+
   Future<void> _fetchTaskLists() async {
     try {
       final response = await http.get(
@@ -129,7 +156,3 @@ class TasksController extends ChangeNotifier {
     await init();
   }
 }
-
-
-
-

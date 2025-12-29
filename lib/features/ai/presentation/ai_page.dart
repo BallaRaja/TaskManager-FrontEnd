@@ -10,10 +10,14 @@ class AIPage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.auto_awesome, size: 100, color: Theme.of(context).primaryColor),
+            Icon(
+              Icons.auto_awesome,
+              size: 100,
+              color: Theme.of(context).primaryColor,
+            ),
             const SizedBox(height: 24),
             const Text(
-              "🤖 AI Assistant",
+              "🤖 i am basava",
               style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),

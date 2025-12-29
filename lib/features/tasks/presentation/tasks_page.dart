@@ -1,5 +1,6 @@
 // lib/features/tasks/presentation/tasks_page.dart
 
+import 'package:client/features/tasks/presentation/widgets/add_task_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -127,7 +128,7 @@ class TasksPage extends StatelessWidget {
             floatingActionButton: FloatingActionButton(
               shape: const CircleBorder(),
               backgroundColor: Colors.purple,
-              onPressed: () => print("Add task"),
+              onPressed: () => showAddTaskSheet(context),
               child: const Icon(Icons.add, color: Colors.white, size: 32),
             ),
           );
