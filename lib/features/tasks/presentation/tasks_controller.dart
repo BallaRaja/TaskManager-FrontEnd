@@ -72,6 +72,41 @@ class TasksController extends ChangeNotifier {
 
   // In TasksController class
 
+  /// NEW: Create a new task list
+  Future<void> createTaskList(String title) async {
+    if (title.trim().isEmpty) return;
+
+    try {
+      final token = await SessionManager.getToken();
+      if (token == null) return;
+
+      final response = await http.post(
+        Uri.parse("${ApiConstants.backendUrl}/api/taskList"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({"title": title.trim(), "isDefault": false}),
+      );
+
+      if (response.statusCode == 201) {
+        await _fetchTaskLists(); // Refresh lists
+        final newList = jsonDecode(response.body)["data"];
+        final newIndex = _taskLists.indexWhere(
+          (l) => l["_id"] == newList["_id"],
+        );
+        if (newIndex != -1) {
+          _selectedListIndex = newIndex; // Auto-select the new list
+        }
+        notifyListeners();
+      } else {
+        print("Failed to create task list: ${response.body}");
+      }
+    } catch (e) {
+      print("Error creating task list: $e");
+    }
+  }
+
   Future<void> createTask(Map<String, dynamic> taskData) async {
     try {
       final token = await SessionManager.getToken();
@@ -89,6 +124,7 @@ class TasksController extends ChangeNotifier {
       if (response.statusCode == 201) {
         await _fetchTasks(); // Refresh tasks
         notifyListeners();
+        print("the task you created is : ${taskData}");
       } else {
         print("Failed to create task: ${response.body}");
       }

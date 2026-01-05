@@ -1,10 +1,8 @@
 // lib/features/tasks/presentation/widgets/task_item.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/utils/session_manager.dart';
 import '../tasks_controller.dart';
@@ -21,7 +19,6 @@ class TaskItem extends StatelessWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final taskDay = DateTime(date.year, date.month, date.day);
-
     if (taskDay == today) {
       final hour = date.hour.toString().padLeft(2, '0');
       final minute = date.minute.toString().padLeft(2, '0');
@@ -32,7 +29,7 @@ class TaskItem extends StatelessWidget {
     return "Later";
   }
 
-  // Optimistically update task list without full refresh
+  // Optimistically update UI
   void _updateLocalTask(
     BuildContext context,
     Map<String, dynamic> updatedTask,
@@ -88,7 +85,6 @@ class TaskItem extends StatelessWidget {
   Future<void> _deleteTask(BuildContext context) async {
     final token = await SessionManager.getToken();
     if (token == null) return;
-
     final taskId = task["_id"].toString();
 
     try {
@@ -121,7 +117,6 @@ class TaskItem extends StatelessWidget {
   Future<void> _archiveTask(BuildContext context) async {
     final token = await SessionManager.getToken();
     if (token == null) return;
-
     final taskId = task["_id"].toString();
 
     try {
@@ -162,7 +157,6 @@ class TaskItem extends StatelessWidget {
 
     return Dismissible(
       key: Key(taskId),
-
       background: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Container(
@@ -179,7 +173,6 @@ class TaskItem extends StatelessWidget {
           ),
         ),
       ),
-
       secondaryBackground: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Container(
@@ -196,10 +189,8 @@ class TaskItem extends StatelessWidget {
           ),
         ),
       ),
-
       confirmDismiss: (direction) async {
         if (direction == DismissDirection.startToEnd) {
-          // Swipe left → delete
           final confirm = await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
@@ -225,14 +216,11 @@ class TaskItem extends StatelessWidget {
             return true;
           }
           return false;
-        } else if (direction == DismissDirection.endToStart) {
-          // Swipe right → archive
+        } else {
           await _archiveTask(context);
           return true;
         }
-        return false;
       },
-
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
@@ -300,7 +288,9 @@ class TaskItem extends StatelessWidget {
                     ? Colors.yellow[600]
                     : Colors.grey[400],
               ),
-              onPressed: () => print("Toggle important $taskId"),
+              onPressed: () => print(
+                "Toggle important $taskId",
+              ), // You can implement this later
             ),
           ],
         ),

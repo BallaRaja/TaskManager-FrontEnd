@@ -1,5 +1,4 @@
 // lib/features/tasks/presentation/widgets/add_task_sheet.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../tasks_controller.dart';
@@ -7,11 +6,7 @@ import '../tasks_controller.dart';
 void showAddTaskSheet(BuildContext context) {
   final controller = Provider.of<TasksController>(context, listen: false);
 
-  final String? defaultTaskListId = controller.taskLists.isNotEmpty
-      ? controller.taskLists[0]["_id"] as String?
-      : null;
-
-  if (defaultTaskListId == null) {
+  if (controller.taskLists.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text("No task list found. Please create one first."),
@@ -20,25 +15,27 @@ void showAddTaskSheet(BuildContext context) {
     return;
   }
 
+  // Use the currently selected task list
+  final String currentTaskListId =
+      controller.taskLists[controller.selectedListIndex]["_id"] as String;
+
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => AddTaskSheet(
-      controller: controller,
-      defaultTaskListId: defaultTaskListId,
-    ),
+    builder: (_) =>
+        AddTaskSheet(controller: controller, taskListId: currentTaskListId),
   );
 }
 
 class AddTaskSheet extends StatefulWidget {
   final TasksController controller;
-  final String defaultTaskListId;
+  final String taskListId; // The ID of the list to add the task to
 
   const AddTaskSheet({
     super.key,
     required this.controller,
-    required this.defaultTaskListId,
+    required this.taskListId,
   });
 
   @override
@@ -53,10 +50,8 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
   bool _isImportant = false;
-
-  // Repeat - fixed logic
   String _repeatFrequency = 'none'; // 'none', 'daily', 'weekly', 'monthly'
-  List<String> _repeatDays = []; // For weekly repeat
+  List<String> _repeatDays = []; // For weekly repeat (e.g., ['mon', 'tue'])
 
   @override
   void initState() {
@@ -80,7 +75,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
 
   String _formatSelectedDate() {
     if (_selectedDate == null) return 'No date';
-    final months = [
+    const months = [
       'January',
       'February',
       'March',
@@ -134,14 +129,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
         child: child!,
       ),
     );
-
     if (picked == null) return;
-
     setState(() => _selectedDate = picked);
-
     if (!mounted) return;
-
-    // Show the options sheet immediately after picking date
     _showDateOptionsSheet();
   }
 
@@ -164,7 +154,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
             ),
             child: Column(
               children: [
-                // Header with selected date
+                // Header
                 Container(
                   padding: const EdgeInsets.all(20),
                   child: Row(
@@ -181,12 +171,11 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(width: 48), // balance
+                      const SizedBox(width: 48),
                     ],
                   ),
                 ),
                 const Divider(height: 1),
-
                 // Set time
                 ListTile(
                   leading: const Icon(Icons.access_time),
@@ -222,7 +211,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                     }
                   },
                 ),
-
                 // Repeat
                 ListTile(
                   leading: const Icon(Icons.repeat),
@@ -243,9 +231,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                     _showRepeatSheet();
                   },
                 ),
-
                 const Spacer(),
-
                 // Done button
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -253,7 +239,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
-                        setState(() {}); // Update main sheet
+                        setState(() {});
                         Navigator.pop(context);
                       },
                       style: ElevatedButton.styleFrom(
@@ -308,7 +294,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                     IconButton(
                       onPressed: () {
                         Navigator.pop(context);
-                        _showDateOptionsSheet(); // Go back to date options
+                        _showDateOptionsSheet();
                       },
                       icon: const Icon(Icons.arrow_back),
                     ),
@@ -321,9 +307,9 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                     ),
                     TextButton(
                       onPressed: () {
-                        setState(() {}); // Update main sheet
+                        setState(() {});
                         Navigator.pop(context);
-                        _showDateOptionsSheet(); // Go back to date options
+                        _showDateOptionsSheet();
                       },
                       child: const Text(
                         'Done',
@@ -333,8 +319,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                   ],
                 ),
                 const SizedBox(height: 20),
-
-                // Repeat options
+                // Repeat frequency options
                 RadioListTile<String>(
                   title: const Text('Does not repeat'),
                   value: 'none',
@@ -343,6 +328,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                   onChanged: (val) {
                     setState(() => _repeatFrequency = val!);
                     setModalState(() => _repeatFrequency = val!);
+                    _repeatDays.clear();
                   },
                 ),
                 RadioListTile<String>(
@@ -353,6 +339,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                   onChanged: (val) {
                     setState(() => _repeatFrequency = val!);
                     setModalState(() => _repeatFrequency = val!);
+                    _repeatDays.clear();
                   },
                 ),
                 RadioListTile<String>(
@@ -363,7 +350,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                   onChanged: (val) {
                     setState(() {
                       _repeatFrequency = val!;
-                      // Set default to current day if empty
                       if (_repeatDays.isEmpty && _selectedDate != null) {
                         final weekday = _selectedDate!.weekday;
                         final days = [
@@ -380,10 +366,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                         _repeatDays = ['mon'];
                       }
                     });
-                    setModalState(() {
-                      _repeatFrequency = val!;
-                      if (_repeatDays.isEmpty) _repeatDays = ['mon'];
-                    });
+                    setModalState(() {});
                   },
                 ),
                 RadioListTile<String>(
@@ -394,10 +377,10 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                   onChanged: (val) {
                     setState(() => _repeatFrequency = val!);
                     setModalState(() => _repeatFrequency = val!);
+                    _repeatDays.clear();
                   },
                 ),
-
-                // Days selector for weekly
+                // Weekly days selector
                 if (_repeatFrequency == 'weekly') ...[
                   const SizedBox(height: 30),
                   const Padding(
@@ -431,24 +414,14 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                             final selected = _repeatDays.contains(dayLower);
                             return GestureDetector(
                               onTap: () {
-                                // Ensure at least one day is selected
-                                if (selected && _repeatDays.length == 1) {
-                                  return;
-                                }
+                                if (selected && _repeatDays.length == 1)
+                                  return; // prevent deselecting last day
                                 setState(() {
-                                  if (selected) {
-                                    _repeatDays.remove(dayLower);
-                                  } else {
-                                    _repeatDays.add(dayLower);
-                                  }
+                                  selected
+                                      ? _repeatDays.remove(dayLower)
+                                      : _repeatDays.add(dayLower);
                                 });
-                                setModalState(() {
-                                  if (selected) {
-                                    _repeatDays.remove(dayLower);
-                                  } else {
-                                    _repeatDays.add(dayLower);
-                                  }
-                                });
+                                setModalState(() {});
                               },
                               child: Container(
                                 width: 50,
@@ -523,7 +496,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
 
     final body = {
       "title": title,
-      "taskListId": widget.defaultTaskListId,
+      "taskListId": widget.taskListId, // Now uses the currently selected list
       if (_notesController.text.trim().isNotEmpty)
         "notes": _notesController.text.trim(),
       if (_fullDueDateTime != null)
@@ -650,14 +623,12 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                               _summaryRow(
                                 Icons.calendar_today,
                                 "${_formatSelectedDate()} • ${_formatTime(_selectedTime)}",
-                                () {
-                                  setState(() {
-                                    _selectedDate = null;
-                                    _selectedTime = null;
-                                    _repeatFrequency = 'none';
-                                    _repeatDays = [];
-                                  });
-                                },
+                                () => setState(() {
+                                  _selectedDate = null;
+                                  _selectedTime = null;
+                                  _repeatFrequency = 'none';
+                                  _repeatDays.clear();
+                                }),
                               ),
                             if (_repeatFrequency != 'none')
                               _summaryRow(
@@ -665,7 +636,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                                 _formatRepeat(),
                                 () => setState(() {
                                   _repeatFrequency = 'none';
-                                  _repeatDays = [];
+                                  _repeatDays.clear();
                                 }),
                               ),
                             if (_isImportant)

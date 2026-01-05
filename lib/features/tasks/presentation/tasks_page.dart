@@ -1,9 +1,7 @@
 // lib/features/tasks/presentation/tasks_page.dart
-
 import 'package:client/features/tasks/presentation/widgets/add_task_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../../profile/presentation/profile_sheet.dart';
 import 'tasks_controller.dart';
 import 'widgets/task_list_tab.dart';
@@ -33,6 +31,38 @@ class TasksPage extends StatelessWidget {
     );
   }
 
+  void _showCreateListDialog(BuildContext context, TasksController controller) {
+    final TextEditingController titleController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("New List"),
+        content: TextField(
+          controller: titleController,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: "Enter list name"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () async {
+              final title = titleController.text.trim();
+              if (title.isNotEmpty) {
+                Navigator.pop(ctx);
+                await controller.createTaskList(title);
+              }
+            },
+            child: const Text("Create"),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
@@ -45,17 +75,45 @@ class TasksPage extends StatelessWidget {
             );
           }
 
-          final currentList = controller.taskLists.isEmpty
-              ? null
-              : controller.taskLists[controller.selectedListIndex];
-          final listTaskIds = currentList?["taskIds"] as List<dynamic>? ?? [];
+          final currentList = controller.taskLists.isNotEmpty
+              ? controller.taskLists[controller.selectedListIndex]
+              : null;
 
-          final displayedTasks = controller.tasks.where((task) {
-            if (currentList?["isDefault"] == true || listTaskIds.isEmpty) {
-              return true;
+          List<Map<String, dynamic>> displayedTasks;
+
+          if (controller.taskLists.isEmpty) {
+            displayedTasks = controller.tasks;
+          } else if (currentList?["isDefault"] == true) {
+            displayedTasks = controller.tasks;
+          } else {
+            final String currentListId = currentList?["_id"] as String;
+            displayedTasks = controller.tasks
+                .where(
+                  (task) => task["taskListId"]?.toString() == currentListId,
+                )
+                .toList();
+          }
+
+          /// 🔍 DEBUG PRINTS (CURRENT LIST + TASKS)
+          if (currentList != null) {
+            debugPrint("🔁 Switched to Task List");
+            debugPrint("📌 Index: ${controller.selectedListIndex}");
+            debugPrint("📂 Title: ${currentList["title"]}");
+            debugPrint("🆔 List ID: ${currentList["_id"]}");
+            debugPrint("⭐ Is Default: ${currentList["isDefault"]}");
+            debugPrint("📊 Total tasks in this list: ${displayedTasks.length}");
+            debugPrint("📝 Tasks:");
+
+            for (final task in displayedTasks) {
+              debugPrint(
+                "  • Task ID: ${task["_id"]} | "
+                "Title: ${task["title"]} | "
+                "Status: ${task["status"]} | "
+                "taskListId: ${task["taskListId"]}",
+              );
             }
-            return listTaskIds.contains(task["_id"]);
-          }).toList();
+            debugPrint("────────────────────────────");
+          }
 
           final pending = displayedTasks
               .where((t) => t["status"] == "pending")
@@ -145,7 +203,10 @@ class TasksPage extends StatelessWidget {
         children: [
           ...controller.taskLists.asMap().entries.map((e) {
             return GestureDetector(
-              onTap: () => controller.selectList(e.key),
+              onTap: () {
+                controller.selectList(e.key);
+                debugPrint("➡️ User tapped list index ${e.key}");
+              },
               child: TaskListTab(
                 title: e.value["title"] ?? "Untitled",
                 isActive: e.key == controller.selectedListIndex,
@@ -154,7 +215,7 @@ class TasksPage extends StatelessWidget {
           }),
           const SizedBox(width: 20),
           GestureDetector(
-            onTap: () => print("Add new list"),
+            onTap: () => _showCreateListDialog(context, controller),
             child: const TaskListTab(title: "Add new list", isAddButton: true),
           ),
         ],
