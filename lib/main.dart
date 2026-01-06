@@ -4,7 +4,7 @@ import 'core/utils/session_manager.dart';
 import 'features/auth/data/auth_api.dart';
 import 'features/auth/presentation/login_page.dart';
 import 'features/tasks/presentation/tasks_page.dart';
-import 'features/ai/presentation/ai_page.dart';
+import 'features/ai/presentation/ai_chat_page.dart';
 import 'features/calendar/presentation/calendar_page.dart';
 
 void main() async {
@@ -110,7 +110,7 @@ class _MainAppShellState extends State<MainAppShell> {
 
   late final List<Widget> _pages = [
     const TasksPage(),
-    const AIPage(),
+    const AIChatPage(),
     const CalendarPage(),
   ];
 

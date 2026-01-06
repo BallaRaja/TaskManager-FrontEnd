@@ -4,12 +4,28 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../profile/presentation/profile_sheet.dart';
 import 'tasks_controller.dart';
+import 'task_view_type.dart';
 import 'widgets/task_list_tab.dart';
 import 'widgets/task_item.dart';
 import 'widgets/completed_section.dart';
 
-class TasksPage extends StatelessWidget {
-  const TasksPage({super.key});
+class TasksPage extends StatefulWidget {
+  final TaskViewType initialViewType;
+
+  const TasksPage({super.key, this.initialViewType = TaskViewType.normal});
+
+  @override
+  State<TasksPage> createState() => _TasksPageState();
+}
+
+class _TasksPageState extends State<TasksPage> {
+  late TaskViewType _viewType;
+
+  @override
+  void initState() {
+    super.initState();
+    _viewType = widget.initialViewType;
+  }
 
   void _showProfileSheet(BuildContext context) {
     showGeneralDialog(
@@ -32,8 +48,7 @@ class TasksPage extends StatelessWidget {
   }
 
   void _showCreateListDialog(BuildContext context, TasksController controller) {
-    final TextEditingController titleController = TextEditingController();
-
+    final titleController = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -63,6 +78,56 @@ class TasksPage extends StatelessWidget {
     );
   }
 
+  void _showViewMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                "Views",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.star, color: Colors.amber),
+              title: const Text("Starred"),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  _viewType = TaskViewType.starred;
+                });
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.archive),
+              title: const Text("Archived"),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() {
+                  _viewType = TaskViewType.archived;
+                });
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: const Text("Close"),
+              onTap: () => Navigator.pop(ctx),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
@@ -75,44 +140,33 @@ class TasksPage extends StatelessWidget {
             );
           }
 
-          final currentList = controller.taskLists.isNotEmpty
-              ? controller.taskLists[controller.selectedListIndex]
-              : null;
-
-          List<Map<String, dynamic>> displayedTasks;
-
-          if (controller.taskLists.isEmpty) {
-            displayedTasks = controller.tasks;
-          } else if (currentList?["isDefault"] == true) {
-            displayedTasks = controller.tasks;
-          } else {
-            final String currentListId = currentList?["_id"] as String;
-            displayedTasks = controller.tasks
-                .where(
-                  (task) => task["taskListId"]?.toString() == currentListId,
-                )
-                .toList();
-          }
-
-          /// 🔍 DEBUG PRINTS (CURRENT LIST + TASKS)
-          if (currentList != null) {
-            debugPrint("🔁 Switched to Task List");
-            debugPrint("📌 Index: ${controller.selectedListIndex}");
-            debugPrint("📂 Title: ${currentList["title"]}");
-            debugPrint("🆔 List ID: ${currentList["_id"]}");
-            debugPrint("⭐ Is Default: ${currentList["isDefault"]}");
-            debugPrint("📊 Total tasks in this list: ${displayedTasks.length}");
-            debugPrint("📝 Tasks:");
-
-            for (final task in displayedTasks) {
-              debugPrint(
-                "  • Task ID: ${task["_id"]} | "
-                "Title: ${task["title"]} | "
-                "Status: ${task["status"]} | "
-                "taskListId: ${task["taskListId"]}",
-              );
+          // === FILTERING LOGIC ===
+          List<Map<String, dynamic>> displayedTasks = controller.tasks;
+          if (_viewType == TaskViewType.normal) {
+            if (controller.taskLists.isEmpty) {
+              displayedTasks = controller.tasks;
+            } else {
+              final currentList =
+                  controller.taskLists[controller.selectedListIndex];
+              if (currentList["isDefault"] == true) {
+                displayedTasks = controller.tasks;
+              } else {
+                final String currentListId = currentList["_id"] as String;
+                displayedTasks = controller.tasks
+                    .where(
+                      (task) => task["taskListId"]?.toString() == currentListId,
+                    )
+                    .toList();
+              }
             }
-            debugPrint("────────────────────────────");
+          } else if (_viewType == TaskViewType.starred) {
+            displayedTasks = controller.tasks
+                .where((task) => task["priority"] == "high")
+                .toList();
+          } else if (_viewType == TaskViewType.archived) {
+            displayedTasks = controller.tasks
+                .where((task) => task["isArchived"] == true)
+                .toList();
           }
 
           final pending = displayedTasks
@@ -129,46 +183,64 @@ class TasksPage extends StatelessWidget {
               child: AppBar(
                 backgroundColor: Colors.transparent,
                 elevation: 0,
-                leading: IconButton(
-                  icon: const Icon(Icons.menu),
-                  onPressed: () {},
-                ),
-                title: const Text(
-                  "Tasks",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                leading: _viewType == TaskViewType.normal
+                    ? IconButton(
+                        icon: const Icon(Icons.menu),
+                        onPressed: () => _showViewMenu(context),
+                      )
+                    : IconButton(
+                        icon: const Icon(Icons.arrow_back),
+                        onPressed: () {
+                          setState(() {
+                            _viewType = TaskViewType.normal;
+                          });
+                        },
+                      ),
+                title: Text(
+                  _viewType == TaskViewType.starred
+                      ? "Starred"
+                      : _viewType == TaskViewType.archived
+                      ? "Archived"
+                      : "Tasks",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
                 ),
                 centerTitle: true,
                 actions: [
+                  // Profile Avatar Button (Top Right)
                   Padding(
-                    padding: const EdgeInsets.only(right: 16),
+                    padding: const EdgeInsets.only(right: 16.0),
                     child: GestureDetector(
                       onTap: () => _showProfileSheet(context),
                       child: CircleAvatar(
                         radius: 18,
-                        backgroundColor: Colors.grey.shade200,
-                        backgroundImage:
-                            controller.avatarUrl?.isNotEmpty == true
+                        backgroundColor: Colors.grey[300],
+                        backgroundImage: controller.avatarUrl != null
                             ? NetworkImage(controller.avatarUrl!)
                             : null,
                         child: controller.isLoadingAvatar
                             ? const SizedBox(
-                                width: 16,
-                                height: 16,
+                                width: 20,
+                                height: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
                                 ),
                               )
-                            : controller.avatarUrl?.isNotEmpty == true
-                            ? null
-                            : const Icon(Icons.person),
+                            : controller.avatarUrl == null
+                            ? const Icon(Icons.person, color: Colors.grey)
+                            : null,
                       ),
                     ),
                   ),
                 ],
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(50),
-                  child: _buildTabBar(context, controller),
-                ),
+                bottom: _viewType == TaskViewType.normal
+                    ? PreferredSize(
+                        preferredSize: const Size.fromHeight(50),
+                        child: _buildTabBar(context, controller),
+                      )
+                    : null,
               ),
             ),
             body: RefreshIndicator(
@@ -183,12 +255,14 @@ class TasksPage extends StatelessWidget {
                 ],
               ),
             ),
-            floatingActionButton: FloatingActionButton(
-              shape: const CircleBorder(),
-              backgroundColor: Colors.purple,
-              onPressed: () => showAddTaskSheet(context),
-              child: const Icon(Icons.add, color: Colors.white, size: 32),
-            ),
+            floatingActionButton: _viewType == TaskViewType.normal
+                ? FloatingActionButton(
+                    shape: const CircleBorder(),
+                    backgroundColor: Colors.purple,
+                    onPressed: () => showAddTaskSheet(context),
+                    child: const Icon(Icons.add, color: Colors.white, size: 32),
+                  )
+                : null,
           );
         },
       ),
@@ -203,10 +277,7 @@ class TasksPage extends StatelessWidget {
         children: [
           ...controller.taskLists.asMap().entries.map((e) {
             return GestureDetector(
-              onTap: () {
-                controller.selectList(e.key);
-                debugPrint("➡️ User tapped list index ${e.key}");
-              },
+              onTap: () => controller.selectList(e.key),
               child: TaskListTab(
                 title: e.value["title"] ?? "Untitled",
                 isActive: e.key == controller.selectedListIndex,
