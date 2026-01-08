@@ -19,63 +19,81 @@ class MonthlyView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Provider.of<CalendarController>(context);
+    final media = MediaQuery.of(context);
+    final isSmallScreen = media.size.width < 360;
+
     final DateTime focusedMonth = DateTime(
       controller.selectedDate.year,
       controller.selectedDate.month,
       1,
     );
+
     final int daysInMonth = _daysInMonth(focusedMonth.year, focusedMonth.month);
-    final DateTime firstDayOfMonth = focusedMonth;
-    final int startWeekday = firstDayOfMonth.weekday % 7; // 0 = Sunday
+
+    final int startWeekday =
+        DateTime(focusedMonth.year, focusedMonth.month, 1).weekday % 7;
 
     final List<Widget> dayCells = [];
 
-    // Empty cells before month starts
+    // Empty slots before first day
     for (int i = 0; i < startWeekday; i++) {
       dayCells.add(const SizedBox.shrink());
     }
 
-    // Actual days
+    // Days
     for (int day = 1; day <= daysInMonth; day++) {
       final DateTime thisDate = DateTime(
         focusedMonth.year,
         focusedMonth.month,
         day,
       );
-      final bool hasTasks = controller.getInstancesForDate(thisDate).isNotEmpty;
+
       final bool isSelected = _isSameDay(thisDate, controller.selectedDate);
+      final bool hasTasks = controller.getInstancesForDate(thisDate).isNotEmpty;
 
       dayCells.add(
         GestureDetector(
           onTap: () => controller.setSelectedDate(thisDate),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: isSelected ? Colors.purple : Colors.transparent,
-                ),
-                child: Center(
+          child: Center(
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: isSmallScreen ? 32 : 38,
+                  height: isSmallScreen ? 32 : 38,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isSelected ? Colors.purple : Colors.transparent,
+                  ),
+                  alignment: Alignment.center,
                   child: Text(
                     day.toString(),
                     style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.black,
+                      fontSize: isSmallScreen ? 12 : 14,
                       fontWeight: isSelected
                           ? FontWeight.bold
                           : FontWeight.normal,
+                      color: isSelected ? Colors.white : Colors.black87,
                     ),
                   ),
                 ),
-              ),
-              if (hasTasks)
-                const Padding(
-                  padding: EdgeInsets.only(top: 4),
-                  child: Icon(Icons.circle, size: 6, color: Colors.purple),
-                ),
-            ],
+
+                // Task dot (overlay — no vertical expansion)
+                if (hasTasks)
+                  Positioned(
+                    bottom: 3,
+                    child: Container(
+                      width: 5,
+                      height: 5,
+                      decoration: const BoxDecoration(
+                        color: Colors.purple,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       );
@@ -83,93 +101,119 @@ class MonthlyView extends StatelessWidget {
 
     return Column(
       children: [
+        // ───── Month Header ─────
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
                 icon: const Icon(Icons.chevron_left),
                 onPressed: () {
-                  final newMonth = DateTime(
-                    controller.selectedDate.year,
-                    controller.selectedDate.month - 1,
+                  controller.setSelectedDate(
+                    DateTime(
+                      controller.selectedDate.year,
+                      controller.selectedDate.month - 1,
+                      1,
+                    ),
                   );
-                  controller.setSelectedDate(newMonth);
                 },
               ),
-              Text(
-                DateFormat('MMMM yyyy').format(focusedMonth),
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
+              Expanded(
+                child: Center(
+                  child: Text(
+                    DateFormat('MMMM yyyy').format(focusedMonth),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
                 ),
               ),
               IconButton(
                 icon: const Icon(Icons.chevron_right),
                 onPressed: () {
-                  final newMonth = DateTime(
-                    controller.selectedDate.year,
-                    controller.selectedDate.month + 1,
+                  controller.setSelectedDate(
+                    DateTime(
+                      controller.selectedDate.year,
+                      controller.selectedDate.month + 1,
+                      1,
+                    ),
                   );
-                  controller.setSelectedDate(newMonth);
                 },
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        // Weekday headers
-        GridView.count(
-          crossAxisCount: 7,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 1.2,
-          children: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-              .map(
-                (day) => Center(
-                  child: Text(
-                    day,
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              )
-              .toList(),
-        ),
-        // Calendar grid
-        Expanded(
-          flex: 2,
-          child: GridView.count(
-            crossAxisCount: 7,
-            physics: const NeverScrollableScrollPhysics(),
-            children: dayCells,
-          ),
-        ),
-        const Divider(),
+
+        // ───── Weekday Row ─────
         Padding(
-          padding: const EdgeInsets.all(16),
-          child: Text(
-            "Tasks on ${DateFormat('EEEE, MMM d').format(controller.selectedDate)}",
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-        ),
-        Expanded(
-          flex: 3,
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            children: controller
-                .getInstancesForDate(controller.selectedDate)
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            children: const ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
                 .map(
-                  (task) => TaskItem(
-                    task: task,
-                    isCompleted: task["status"] == "completed",
+                  (day) => Expanded(
+                    child: Center(
+                      child: Text(
+                        day,
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
                   ),
                 )
                 .toList(),
           ),
+        ),
+
+        const SizedBox(height: 6),
+
+        // ───── Calendar Grid (NO FIXED HEIGHT) ─────
+        GridView.count(
+          crossAxisCount: 7,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          childAspectRatio: isSmallScreen ? 1.25 : 1.15,
+          children: dayCells,
+        ),
+
+        const Divider(height: 1),
+
+        // ───── Selected Day Header ─────
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Text(
+            "Tasks on ${DateFormat('EEEE, MMM d').format(controller.selectedDate)}",
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          ),
+        ),
+
+        // ───── Task List ─────
+        Expanded(
+          child: controller.getInstancesForDate(controller.selectedDate).isEmpty
+              ? const Center(
+                  child: Text(
+                    "No tasks for this day",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: controller
+                      .getInstancesForDate(controller.selectedDate)
+                      .length,
+                  itemBuilder: (context, index) {
+                    final task = controller.getInstancesForDate(
+                      controller.selectedDate,
+                    )[index];
+                    return TaskItem(
+                      task: task,
+                      isCompleted: task["status"] == "completed",
+                    );
+                  },
+                ),
         ),
       ],
     );

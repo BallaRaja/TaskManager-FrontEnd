@@ -1,7 +1,10 @@
 // lib/features/tasks/presentation/tasks_page.dart
+import 'dart:async';
 import 'package:client/features/tasks/presentation/widgets/add_task_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+
 import '../../profile/presentation/profile_sheet.dart';
 import 'tasks_controller.dart';
 import 'task_view_type.dart';
@@ -20,11 +23,30 @@ class TasksPage extends StatefulWidget {
 
 class _TasksPageState extends State<TasksPage> {
   late TaskViewType _viewType;
+  late Timer _clockTimer;
+  DateTime _now = DateTime.now();
 
   @override
   void initState() {
     super.initState();
     _viewType = widget.initialViewType;
+
+    // 🔄 Update time every minute
+    _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      setState(() {
+        _now = DateTime.now();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _clockTimer.cancel();
+    super.dispose();
+  }
+
+  String get _formattedTime {
+    return DateFormat('hh:mm a').format(_now);
   }
 
   void _showProfileSheet(BuildContext context) {
@@ -142,16 +164,13 @@ class _TasksPageState extends State<TasksPage> {
 
           // === FILTERING LOGIC ===
           List<Map<String, dynamic>> displayedTasks = controller.tasks;
+
           if (_viewType == TaskViewType.normal) {
-            if (controller.taskLists.isEmpty) {
-              displayedTasks = controller.tasks;
-            } else {
+            if (controller.taskLists.isNotEmpty) {
               final currentList =
                   controller.taskLists[controller.selectedListIndex];
-              if (currentList["isDefault"] == true) {
-                displayedTasks = controller.tasks;
-              } else {
-                final String currentListId = currentList["_id"] as String;
+              if (currentList["isDefault"] != true) {
+                final String currentListId = currentList["_id"];
                 displayedTasks = controller.tasks
                     .where(
                       (task) => task["taskListId"]?.toString() == currentListId,
@@ -196,20 +215,46 @@ class _TasksPageState extends State<TasksPage> {
                           });
                         },
                       ),
-                title: Text(
-                  _viewType == TaskViewType.starred
-                      ? "Starred"
-                      : _viewType == TaskViewType.archived
-                      ? "Archived"
-                      : "Tasks",
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                  ),
+
+                // 🧠 CUSTOM TITLE ROW (Title + Time)
+                title: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _viewType == TaskViewType.starred
+                          ? "Starred"
+                          : _viewType == TaskViewType.archived
+                          ? "Archived"
+                          : "Tasks",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _formattedTime,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.purple,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 centerTitle: true,
+
                 actions: [
-                  // Profile Avatar Button (Top Right)
                   Padding(
                     padding: const EdgeInsets.only(right: 16.0),
                     child: GestureDetector(
@@ -235,6 +280,7 @@ class _TasksPageState extends State<TasksPage> {
                     ),
                   ),
                 ],
+
                 bottom: _viewType == TaskViewType.normal
                     ? PreferredSize(
                         preferredSize: const Size.fromHeight(50),
