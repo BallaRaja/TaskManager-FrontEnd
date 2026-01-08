@@ -1,8 +1,14 @@
+import 'dart:convert';
+import 'package:client/features/ai/models/message.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
+
 import '../ai_controller.dart';
 import 'widgets/message_bubble.dart';
 import 'widgets/suggestion_chip.dart';
+import '../../../core/constants/api_constants.dart';
+import '../../../core/utils/session_manager.dart';
 
 class AIChatPage extends StatefulWidget {
   const AIChatPage({super.key});
@@ -15,14 +21,21 @@ class _AIChatPageState extends State<AIChatPage> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
+  List<Map<String, dynamic>> _taskLists = [];
+  bool _isLoadingLists = false;
+
   final List<String> suggestions = [
     "What's my schedule today?",
-    "Add task: Call mom tomorrow at 8 PM",
+    "Add task: Buy milk tomorrow",
     "Show me overdue tasks",
     "Give me a productivity tip",
-    "How was my week?",
-    "Help me plan my morning",
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTaskLists();
+  }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -36,6 +49,78 @@ class _AIChatPageState extends State<AIChatPage> {
     });
   }
 
+  /// 🔹 Fetch taskLists for user
+  Future<void> _fetchTaskLists() async {
+    try {
+      setState(() => _isLoadingLists = true);
+
+      final userId = await SessionManager.getUserId();
+      if (userId == null) return;
+
+      final res = await http.get(
+        Uri.parse("${ApiConstants.backendUrl}/api/taskList/$userId"),
+      );
+
+      if (res.statusCode == 200) {
+        final List raw = jsonDecode(res.body)["data"] ?? [];
+        final lists = List<Map<String, dynamic>>.from(raw);
+
+        // Default list first
+        lists.sort((a, b) {
+          if (a["isDefault"] == true) return -1;
+          if (b["isDefault"] == true) return 1;
+          return 0;
+        });
+
+        setState(() => _taskLists = lists);
+      }
+    } catch (e) {
+      debugPrint("❌ TaskList fetch error: $e");
+    } finally {
+      setState(() => _isLoadingLists = false);
+    }
+  }
+
+  /// 🔹 Show taskList picker sheet
+  Future<String?> _showTaskListPicker() async {
+    if (_taskLists.isEmpty) return null;
+
+    return showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                "Choose Task List",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ..._taskLists.map((list) {
+              return ListTile(
+                leading: Icon(
+                  list["isDefault"] == true ? Icons.star : Icons.folder,
+                  color: Colors.purple,
+                ),
+                title: Text(list["title"]),
+                subtitle: list["isDefault"] == true
+                    ? const Text("Default")
+                    : null,
+                onTap: () => Navigator.pop(context, list["_id"]),
+              );
+            }).toList(),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
@@ -46,158 +131,146 @@ class _AIChatPageState extends State<AIChatPage> {
 
           return Scaffold(
             appBar: AppBar(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              title: const Text(
-                "AI Assistant",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-              ),
+              title: const Text("AI Assistant"),
               centerTitle: true,
               actions: [
                 IconButton(
                   icon: const Icon(Icons.refresh),
-                  onPressed: () {
-                    aiController.clearChat();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Chat cleared!")),
-                    );
-                  },
+                  onPressed: aiController.clearChat,
                 ),
               ],
             ),
             body: Column(
               children: [
-                // Greeting + Suggestions when empty
+                // Empty state
                 if (aiController.messages.isEmpty)
                   Expanded(
                     child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.smart_toy,
-                              size: 80,
-                              color: Colors.purple.withOpacity(0.6),
-                            ),
-                            const SizedBox(height: 20),
-                            const Text(
-                              "Hi! I'm your AI assistant",
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            const Text(
-                              "I can help you manage tasks, plan your day, and stay productive.",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                            const SizedBox(height: 32),
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 12,
-                              children: suggestions.map((s) {
-                                return SuggestionChip(
-                                  label: s,
-                                  onTap: () {
-                                    _controller.text = s;
-                                    aiController.sendMessage(s);
-                                  },
-                                );
-                              }).toList(),
-                            ),
-                          ],
-                        ),
+                      child: Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: suggestions.map((s) {
+                          return SuggestionChip(
+                            label: s,
+                            onTap: () {
+                              _controller.text = s;
+                              aiController.sendMessage(s);
+                            },
+                          );
+                        }).toList(),
                       ),
                     ),
                   )
                 else
-                  // Chat messages
                   Expanded(
                     child: ListView.builder(
                       controller: _scrollController,
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 100),
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 120),
                       itemCount: aiController.messages.length,
                       itemBuilder: (context, index) {
-                        return MessageBubble(
-                          message: aiController.messages[index],
+                        final msg = aiController.messages[index];
+                        final isLast =
+                            index == aiController.messages.length - 1;
+
+                        return Column(
+                          crossAxisAlignment: msg.role == MessageRole.user
+                              ? CrossAxisAlignment.end
+                              : CrossAxisAlignment.start,
+                          children: [
+                            MessageBubble(message: msg),
+
+                            // 🔥 Task confirmation actions
+                            if (isLast &&
+                                msg.role == MessageRole.assistant &&
+                                aiController.pendingTaskToCreate != null)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  top: 8,
+                                  left: 60,
+                                ),
+                                child: Row(
+                                  children: [
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        final defaultList = _taskLists
+                                            .firstWhere(
+                                              (l) => l["isDefault"] == true,
+                                            );
+
+                                        aiController
+                                                .pendingTaskToCreate!["taskListId"] =
+                                            defaultList["_id"];
+
+                                        await aiController.confirmTaskCreation(
+                                          context,
+                                        );
+                                      },
+                                      child: const Text("Add to Default"),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    TextButton(
+                                      onPressed: () async {
+                                        final listId =
+                                            await _showTaskListPicker();
+                                        if (listId != null) {
+                                          aiController
+                                                  .pendingTaskToCreate!["taskListId"] =
+                                              listId;
+                                          await aiController
+                                              .confirmTaskCreation(context);
+                                        }
+                                      },
+                                      child: const Text("Choose list"),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
                         );
                       },
                     ),
                   ),
 
-                // Input Bar
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    border: Border(top: BorderSide(color: Colors.grey[300]!)),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _controller,
-                          maxLines: null,
-                          decoration: InputDecoration(
-                            hintText: "Ask me anything...",
-                            filled: true,
-                            fillColor: Colors.grey[100],
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(30),
-                              borderSide: BorderSide.none,
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 14,
-                            ),
-                          ),
-                          onSubmitted: (value) {
-                            if (value.trim().isNotEmpty) {
-                              aiController.sendMessage(value.trim());
-                              _controller.clear();
-                            }
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      FloatingActionButton(
-                        mini: true,
-                        backgroundColor: Colors.purple,
-                        elevation: 4,
-                        onPressed: aiController.isLoading
-                            ? null
-                            : () {
-                                final text = _controller.text.trim();
-                                if (text.isNotEmpty) {
-                                  aiController.sendMessage(text);
-                                  _controller.clear();
-                                }
-                              },
-                        child: aiController.isLoading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(
-                                Icons.send_rounded,
-                                color: Colors.white,
-                              ),
-                      ),
-                    ],
-                  ),
-                ),
+                // Input bar
+                _buildInputBar(aiController),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildInputBar(AIController aiController) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              decoration: const InputDecoration(hintText: "Ask me anything..."),
+              onSubmitted: (v) {
+                if (v.trim().isNotEmpty) {
+                  aiController.sendMessage(v.trim());
+                  _controller.clear();
+                }
+              },
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.send),
+            onPressed: aiController.isLoading
+                ? null
+                : () {
+                    final text = _controller.text.trim();
+                    if (text.isNotEmpty) {
+                      aiController.sendMessage(text);
+                      _controller.clear();
+                    }
+                  },
+          ),
+        ],
       ),
     );
   }
