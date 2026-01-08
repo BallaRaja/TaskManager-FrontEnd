@@ -1,10 +1,8 @@
 // lib/features/tasks/presentation/widgets/task_item.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/utils/session_manager.dart';
 import '../tasks_controller.dart';
@@ -21,7 +19,6 @@ class TaskItem extends StatelessWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final taskDay = DateTime(date.year, date.month, date.day);
-
     if (taskDay == today) {
       final hour = date.hour.toString().padLeft(2, '0');
       final minute = date.minute.toString().padLeft(2, '0');
@@ -32,7 +29,6 @@ class TaskItem extends StatelessWidget {
     return "Later";
   }
 
-  // Optimistically update task list without full refresh
   void _updateLocalTask(
     BuildContext context,
     Map<String, dynamic> updatedTask,
@@ -54,10 +50,8 @@ class TaskItem extends StatelessWidget {
   Future<void> _toggleComplete(BuildContext context) async {
     final token = await SessionManager.getToken();
     if (token == null) return;
-
     final newStatus = isCompleted ? "pending" : "completed";
     final taskId = task["_id"].toString();
-
     try {
       final response = await http.put(
         Uri.parse("${ApiConstants.backendUrl}/api/task/$taskId"),
@@ -71,7 +65,6 @@ class TaskItem extends StatelessWidget {
           if (isCompleted) "completedAt": null,
         }),
       );
-
       if (response.statusCode == 200) {
         final updatedTask = jsonDecode(response.body)["data"];
         _updateLocalTask(context, updatedTask);
@@ -85,18 +78,71 @@ class TaskItem extends StatelessWidget {
     }
   }
 
+  // NEW: Toggle Important / Star
+  Future<void> _toggleImportant(BuildContext context) async {
+    final token = await SessionManager.getToken();
+    if (token == null) return;
+    final taskId = task["_id"].toString();
+    final bool currentlyImportant = task["priority"] == "high";
+    final String newPriority = currentlyImportant ? "medium" : "high";
+    // Optimistic UI update
+    final optimisticTask = Map<String, dynamic>.from(task);
+    optimisticTask["priority"] = newPriority;
+    _updateLocalTask(context, optimisticTask);
+    try {
+      final response = await http.put(
+        Uri.parse("${ApiConstants.backendUrl}/api/task/$taskId"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({"priority": newPriority}),
+      );
+      if (response.statusCode == 200) {
+        final updatedTask = jsonDecode(response.body)["data"];
+        _updateLocalTask(context, updatedTask);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                currentlyImportant
+                    ? "Removed from Starred"
+                    : "Added to Starred",
+              ),
+              backgroundColor: currentlyImportant ? Colors.grey : Colors.amber,
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }
+      } else {
+        // Revert on failure
+        _updateLocalTask(context, task);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Failed to update priority")),
+          );
+        }
+      }
+    } catch (e) {
+      // Revert on error
+      _updateLocalTask(context, task);
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Network error")));
+      }
+    }
+  }
+
   Future<void> _deleteTask(BuildContext context) async {
     final token = await SessionManager.getToken();
     if (token == null) return;
-
     final taskId = task["_id"].toString();
-
     try {
       final response = await http.delete(
         Uri.parse("${ApiConstants.backendUrl}/api/task/$taskId"),
         headers: {"Authorization": "Bearer $token"},
       );
-
       if (response.statusCode == 200) {
         _removeLocalTask(context);
         if (context.mounted) {
@@ -121,9 +167,7 @@ class TaskItem extends StatelessWidget {
   Future<void> _archiveTask(BuildContext context) async {
     final token = await SessionManager.getToken();
     if (token == null) return;
-
     final taskId = task["_id"].toString();
-
     try {
       final response = await http.put(
         Uri.parse("${ApiConstants.backendUrl}/api/task/$taskId"),
@@ -133,7 +177,6 @@ class TaskItem extends StatelessWidget {
         },
         body: jsonEncode({"isArchived": true}),
       );
-
       if (response.statusCode == 200) {
         _removeLocalTask(context);
         if (context.mounted) {
@@ -154,15 +197,47 @@ class TaskItem extends StatelessWidget {
     }
   }
 
+  Future<void> _unarchiveTask(BuildContext context) async {
+    final token = await SessionManager.getToken();
+    if (token == null) return;
+    final taskId = task["_id"].toString();
+    try {
+      final response = await http.put(
+        Uri.parse("${ApiConstants.backendUrl}/api/task/$taskId"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({"isArchived": false}),
+      );
+      if (response.statusCode == 200) {
+        _removeLocalTask(context);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Task unarchived"),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Failed to unarchive")));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final dueText = _formatDueDate(task["dueDate"]);
     final isToday = dueText?.startsWith("Today") == true;
-    final taskId = task["_id"].toString();
-
+    final bool isArchived = task["isArchived"] == true;
+    final bool isImportant = task["priority"] == "high";
     return Dismissible(
-      key: Key(taskId),
-
+      key: Key(task["_id"].toString()),
       background: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Container(
@@ -179,27 +254,60 @@ class TaskItem extends StatelessWidget {
           ),
         ),
       ),
-
       secondaryBackground: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          color: Colors.grey[700],
+          color: isArchived ? Colors.green : Colors.grey[700],
           alignment: Alignment.centerRight,
           padding: const EdgeInsets.only(right: 24),
-          child: const Column(
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.archive, color: Colors.white, size: 28),
+              Icon(
+                isArchived ? Icons.unarchive : Icons.archive,
+                color: Colors.white,
+                size: 28,
+              ),
               SizedBox(height: 4),
-              Text("Archive", style: TextStyle(color: Colors.white)),
+              Text(
+                isArchived ? "Unarchive" : "Archive",
+                style: const TextStyle(color: Colors.white),
+              ),
             ],
           ),
         ),
       ),
-
       confirmDismiss: (direction) async {
+        if (isArchived) {
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text("Unarchive Task?"),
+              content: const Text(
+                "This task will return to your active lists.",
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text("Cancel"),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text(
+                    "Unarchive",
+                    style: TextStyle(color: Colors.green),
+                  ),
+                ),
+              ],
+            ),
+          );
+          if (confirm == true) {
+            await _unarchiveTask(context);
+            return true;
+          }
+          return false;
+        }
         if (direction == DismissDirection.startToEnd) {
-          // Swipe left → delete
           final confirm = await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
@@ -225,14 +333,11 @@ class TaskItem extends StatelessWidget {
             return true;
           }
           return false;
-        } else if (direction == DismissDirection.endToStart) {
-          // Swipe right → archive
+        } else {
           await _archiveTask(context);
           return true;
         }
-        return false;
       },
-
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
@@ -255,10 +360,10 @@ class TaskItem extends StatelessWidget {
         child: Row(
           children: [
             GestureDetector(
-              onTap: () => _toggleComplete(context),
+              onTap: isArchived ? null : () => _toggleComplete(context),
               child: Checkbox(
                 value: isCompleted,
-                onChanged: (_) => _toggleComplete(context),
+                onChanged: isArchived ? null : (_) => _toggleComplete(context),
                 shape: const CircleBorder(),
                 activeColor: Colors.purple,
               ),
@@ -293,14 +398,17 @@ class TaskItem extends StatelessWidget {
                 ],
               ),
             ),
+            // STAR / IMPORTANT BUTTON
             IconButton(
               icon: Icon(
-                Icons.star,
-                color: task["priority"] == "high"
-                    ? Colors.yellow[600]
-                    : Colors.grey[400],
+                isImportant ? Icons.star : Icons.star_border,
+                color: isImportant ? Colors.amber : Colors.grey[400],
+                size: 28,
               ),
-              onPressed: () => print("Toggle important $taskId"),
+              onPressed: isArchived ? null : () => _toggleImportant(context),
+              tooltip: isImportant
+                  ? "Remove from Starred"
+                  : "Mark as Important",
             ),
           ],
         ),

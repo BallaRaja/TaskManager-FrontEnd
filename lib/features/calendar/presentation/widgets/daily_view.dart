@@ -1,0 +1,56 @@
+// lib/features/calendar/presentation/widgets/daily_view.dart
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+import '../calendar_controller.dart';
+import '../../../tasks/presentation/widgets/task_item.dart';
+
+class DailyView extends StatelessWidget {
+  const DailyView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = Provider.of<CalendarController>(context);
+    final overdue = controller.getOverdueInstances();
+    final todayTasks = controller.getInstancesForDate(controller.selectedDate);
+    final tomorrow = controller.selectedDate.add(const Duration(days: 1));
+    final tomorrowTasks = controller.getInstancesForDate(tomorrow);
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (overdue.isNotEmpty) ...[
+          const Text(
+            "OVERDUE",
+            style: TextStyle(
+              color: Colors.red,
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...overdue.map((t) => TaskItem(task: t, isCompleted: false)),
+          const Divider(height: 32),
+        ],
+        Text(
+          "Today — ${DateFormat('EEEE, MMM d').format(controller.selectedDate)}",
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        ...todayTasks.map(
+          (t) => TaskItem(task: t, isCompleted: t["status"] == "completed"),
+        ),
+        const Divider(height: 40),
+        Text(
+          "Tomorrow — ${DateFormat('EEEE, MMM d').format(tomorrow)}",
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        ...tomorrowTasks.map(
+          (t) => TaskItem(task: t, isCompleted: t["status"] == "completed"),
+        ),
+        const SizedBox(height: 100),
+      ],
+    );
+  }
+}
