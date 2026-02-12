@@ -23,6 +23,7 @@ class _CalendarPageState extends State<CalendarPage> {
   final List<String> _titles = const ["Daily", "Weekly", "Monthly"];
 
   void _showProfileSheet(BuildContext context) {
+    final controller = Provider.of<CalendarController>(context, listen: false);
     showGeneralDialog(
       context: context,
       barrierDismissible: true,
@@ -39,7 +40,10 @@ class _CalendarPageState extends State<CalendarPage> {
           child: child,
         );
       },
-    );
+    ).then((_) {
+      // Refresh avatar after profile sheet closes
+      controller.refreshAvatar();
+    });
   }
 
   @override
@@ -90,10 +94,14 @@ class _CalendarPageState extends State<CalendarPage> {
                     child: CircleAvatar(
                       radius: 18,
                       backgroundColor: Colors.grey[300],
-                      backgroundImage: controller.avatarUrl != null
+                      backgroundImage:
+                          controller.avatarUrl != null &&
+                              controller.avatarUrl!.isNotEmpty
                           ? NetworkImage(controller.avatarUrl!)
                           : null,
-                      child: controller.avatarUrl == null
+                      child:
+                          controller.avatarUrl == null ||
+                              controller.avatarUrl!.isEmpty
                           ? const Icon(Icons.person, color: Colors.grey)
                           : null,
                     ),

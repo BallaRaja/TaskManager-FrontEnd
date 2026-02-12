@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+import 'package:http_parser/http_parser.dart';
 
 import 'package:client/core/constants/api_constants.dart';
 import '../../../core/utils/session_manager.dart';
@@ -18,10 +21,13 @@ class ManageProfilePage extends StatefulWidget {
 class _ManageProfilePageState extends State<ManageProfilePage> {
   late TextEditingController _nameController;
   late TextEditingController _bioController;
-  late TextEditingController _avatarUrlController;
 
   bool _isLoading = false;
+  bool _isUploadingPhoto = false;
+  bool _hasChanges = false; // Track if photo was uploaded/deleted
   String? _avatarPreviewUrl;
+  File? _selectedImageFile;
+  final ImagePicker _picker = ImagePicker();
 
   // Store original email to send it back unchanged
   late String _originalEmail;
@@ -33,25 +39,254 @@ class _ManageProfilePageState extends State<ManageProfilePage> {
 
     _nameController = TextEditingController(text: profile["fullName"] ?? "");
     _bioController = TextEditingController(text: profile["bio"] ?? "");
-    _avatarUrlController = TextEditingController(
-      text: profile["avatarUrl"] ?? "",
-    );
 
     // Store original email
     _originalEmail = (profile["email"] as String?)?.trim() ?? "";
 
-    // Initial avatar preview
-    _avatarPreviewUrl = profile["avatarUrl"]?.toString().isNotEmpty == true
-        ? profile["avatarUrl"]
-        : null;
+    // Initial avatar preview - handle relative URLs from backend
+    final avatarUrl = profile["avatarUrl"]?.toString();
+    if (avatarUrl != null &&
+        avatarUrl.isNotEmpty &&
+        !avatarUrl.contains('placeholder')) {
+      if (avatarUrl.startsWith('/')) {
+        // Relative URL from backend
+        _avatarPreviewUrl = "${ApiConstants.backendUrl}$avatarUrl";
+      } else if (avatarUrl.startsWith('http')) {
+        // Absolute URL
+        _avatarPreviewUrl = avatarUrl;
+      } else {
+        _avatarPreviewUrl = null;
+      }
+    } else {
+      _avatarPreviewUrl = null;
+    }
+
+    print("🧪 [ManageProfile] Initial avatar preview: $_avatarPreviewUrl");
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _bioController.dispose();
-    _avatarUrlController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImageFile = File(pickedFile.path);
+          _avatarPreviewUrl = pickedFile.path; // Local file path for preview
+        });
+
+        // Automatically upload the photo
+        await _uploadPhoto();
+      }
+    } catch (e) {
+      print("🧪 [ManageProfile] Image picker error: $e");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to pick image: $e")));
+    }
+  }
+
+  Future<void> _uploadPhoto() async {
+    if (_selectedImageFile == null) return;
+
+    final token = await SessionManager.getToken();
+    final userId = await SessionManager.getUserId();
+
+    if (token == null || userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Session expired. Please login again.")),
+      );
+      return;
+    }
+
+    setState(() => _isUploadingPhoto = true);
+
+    try {
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse("${ApiConstants.backendUrl}/api/profile/$userId/photo"),
+      );
+
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // Get file extension
+      final extension = _selectedImageFile!.path.split('.').last.toLowerCase();
+
+      // Determine content type
+      MediaType contentType;
+      switch (extension) {
+        case 'jpg':
+        case 'jpeg':
+          contentType = MediaType('image', 'jpeg');
+          break;
+        case 'png':
+          contentType = MediaType('image', 'png');
+          break;
+        case 'gif':
+          contentType = MediaType('image', 'gif');
+          break;
+        case 'webp':
+          contentType = MediaType('image', 'webp');
+          break;
+        default:
+          contentType = MediaType('image', 'jpeg');
+      }
+
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'photo',
+          _selectedImageFile!.path,
+          contentType: contentType,
+        ),
+      );
+
+      print("🧪 [ManageProfile] Uploading photo...");
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print("🧪 [ManageProfile] Upload response: ${response.statusCode}");
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        final newAvatarUrl = responseData['data']['avatarUrl'];
+        print("🧪 [ManageProfile] New avatar URL from backend: $newAvatarUrl");
+
+        setState(() {
+          _avatarPreviewUrl = "${ApiConstants.backendUrl}$newAvatarUrl";
+          _selectedImageFile = null; // Clear local file after upload
+          _hasChanges = true; // Mark that changes were made
+        });
+
+        print("🧪 [ManageProfile] Full avatar URL set to: $_avatarPreviewUrl");
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Photo uploaded successfully!"),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        final errorMsg =
+            jsonDecode(response.body)["message"] ?? "Failed to upload photo";
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMsg), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      print("🧪 [ManageProfile] Upload error: $e");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Upload error: $e")));
+    } finally {
+      setState(() => _isUploadingPhoto = false);
+    }
+  }
+
+  Future<void> _deletePhoto() async {
+    final token = await SessionManager.getToken();
+    final userId = await SessionManager.getUserId();
+
+    if (token == null || userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Session expired. Please login again.")),
+      );
+      return;
+    }
+
+    setState(() => _isUploadingPhoto = true);
+
+    try {
+      final response = await http.delete(
+        Uri.parse("${ApiConstants.backendUrl}/api/profile/$userId/photo"),
+        headers: {"Authorization": "Bearer $token"},
+      );
+
+      print("🧪 [ManageProfile] Delete photo response: ${response.statusCode}");
+
+      if (response.statusCode == 200) {
+        setState(() {
+          _avatarPreviewUrl = null;
+          _selectedImageFile = null;
+          _hasChanges = true; // Mark that changes were made
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Photo deleted successfully!"),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Failed to delete photo")));
+      }
+    } catch (e) {
+      print("🧪 [ManageProfile] Delete error: $e");
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Delete error: $e")));
+    } finally {
+      setState(() => _isUploadingPhoto = false);
+    }
+  }
+
+  void _showImageSourceDialog() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: Colors.blue),
+                title: const Text('Choose from Gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: Colors.green),
+                title: const Text('Take a Photo'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              if (_avatarPreviewUrl != null &&
+                  !_avatarPreviewUrl!.contains('placeholder'))
+                ListTile(
+                  leading: const Icon(Icons.delete, color: Colors.red),
+                  title: const Text('Remove Photo'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _deletePhoto();
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _saveChanges() async {
@@ -67,13 +302,38 @@ class _ManageProfilePageState extends State<ManageProfilePage> {
 
     setState(() => _isLoading = true);
 
+    // Fetch latest profile to get current avatarUrl (in case photo was uploaded)
+    String? currentAvatarUrl;
+    try {
+      final profileResponse = await http.get(
+        Uri.parse("${ApiConstants.backendUrl}/api/profile/$userId"),
+        headers: {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        },
+      );
+      if (profileResponse.statusCode == 200) {
+        final profileData = jsonDecode(profileResponse.body);
+        currentAvatarUrl = profileData["data"]["profile"]["avatarUrl"];
+        print(
+          "🧪 [ManageProfile] Current avatarUrl from backend: $currentAvatarUrl",
+        );
+      }
+    } catch (e) {
+      print("🧪 [ManageProfile] Error fetching current profile: $e");
+    }
+
+    // Fallback to widget data if fetch failed
+    currentAvatarUrl ??=
+        widget.profileData["profile"]["avatarUrl"] ??
+        "https://via.placeholder.com/150";
+
     final updates = {
       "profile": {
         "fullName": _nameController.text.trim(),
         "bio": _bioController.text.trim(),
         "email": _originalEmail, // ← Always include the current email
-        if (_avatarUrlController.text.trim().isNotEmpty)
-          "avatarUrl": _avatarUrlController.text.trim(),
+        "avatarUrl": currentAvatarUrl, // ← Preserve the current avatar
       },
     };
 
@@ -137,7 +397,7 @@ class _ManageProfilePageState extends State<ManageProfilePage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(context, _hasChanges),
         ),
         title: const Text(
           "Manage Account",
@@ -155,36 +415,79 @@ class _ManageProfilePageState extends State<ManageProfilePage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16), // slight rounding
-                    child: Container(
-                      width: MediaQuery.of(context).size.width * 0.72,
-                      height: MediaQuery.of(context).size.width * 0.72,
-                      decoration: BoxDecoration(color: Colors.grey[300]),
-                      child:
-                          _avatarPreviewUrl != null &&
-                              _avatarPreviewUrl!.isNotEmpty
-                          ? Image.network(
-                              _avatarPreviewUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(
-                                    Icons.broken_image,
-                                    size: 90,
-                                    color: Colors.grey,
-                                  ),
-                            )
-                          : const Icon(
-                              Icons.person,
-                              size: 140,
-                              color: Colors.grey,
+                  Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          width: MediaQuery.of(context).size.width * 0.72,
+                          height: MediaQuery.of(context).size.width * 0.72,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            border: Border.all(
+                              color: Colors.grey[400]!,
+                              width: 2,
                             ),
-                    ),
+                          ),
+                          child: _isUploadingPhoto
+                              ? const Center(child: CircularProgressIndicator())
+                              : _selectedImageFile != null
+                              ? Image.file(
+                                  _selectedImageFile!,
+                                  fit: BoxFit.cover,
+                                )
+                              : _avatarPreviewUrl != null &&
+                                    _avatarPreviewUrl!.isNotEmpty &&
+                                    !_avatarPreviewUrl!.contains('placeholder')
+                              ? Image.network(
+                                  _avatarPreviewUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      const Icon(
+                                        Icons.broken_image,
+                                        size: 90,
+                                        color: Colors.grey,
+                                      ),
+                                )
+                              : const Icon(
+                                  Icons.person,
+                                  size: 140,
+                                  color: Colors.grey,
+                                ),
+                        ),
+                      ),
+
+                      // Edit button overlay
+                      Positioned(
+                        bottom: 8,
+                        right: 8,
+                        child: Material(
+                          color: Colors.blue[600],
+                          borderRadius: BorderRadius.circular(30),
+                          elevation: 4,
+                          child: InkWell(
+                            onTap: _isUploadingPhoto
+                                ? null
+                                : _showImageSourceDialog,
+                            borderRadius: BorderRadius.circular(30),
+                            child: const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: Icon(
+                                Icons.camera_alt,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    "Change your avatar by entering a new image URL below",
+                    "Tap the camera icon to change your photo",
                     style: TextStyle(color: Colors.grey[600], fontSize: 15),
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
@@ -196,31 +499,6 @@ class _ManageProfilePageState extends State<ManageProfilePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Avatar URL Input
-                  TextField(
-                    controller: _avatarUrlController,
-                    decoration: InputDecoration(
-                      labelText: "Avatar Image URL",
-                      hintText: "https://example.com/your-photo.jpg",
-                      prefixIcon: const Icon(Icons.link),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      filled: true,
-                      fillColor: isDark ? Colors.grey[850] : Colors.white,
-                    ),
-                    keyboardType: TextInputType.url,
-                    onChanged: (value) {
-                      setState(() {
-                        _avatarPreviewUrl = value.trim().isNotEmpty
-                            ? value.trim()
-                            : null;
-                      });
-                    },
-                  ),
-
-                  const SizedBox(height: 32),
-
                   // Full Name
                   TextField(
                     controller: _nameController,

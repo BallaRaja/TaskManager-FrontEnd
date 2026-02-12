@@ -58,6 +58,9 @@ class _ProfileSheetState extends State<ProfileSheet> {
       }
 
       final decoded = jsonDecode(response.body);
+      print(
+        "🧪 [Profile] Profile data loaded: ${decoded["data"]["profile"]["avatarUrl"]}",
+      );
       setState(() {
         profileData = decoded["data"];
         isLoading = false;
@@ -183,7 +186,26 @@ class _ProfileSheetState extends State<ProfileSheet> {
     final aiFeatures = profileData!["aiFeatures"] as bool;
 
     final avatarUrl = user["avatarUrl"] ?? '';
-    final hasAvatar = avatarUrl.isNotEmpty;
+
+    // Build full avatar URL
+    String? fullAvatarUrl;
+    bool hasAvatar = false;
+
+    if (avatarUrl.isNotEmpty && !avatarUrl.contains('placeholder')) {
+      if (avatarUrl.startsWith('/')) {
+        // Relative URL from backend
+        fullAvatarUrl = "${ApiConstants.backendUrl}$avatarUrl";
+        hasAvatar = true;
+      } else if (avatarUrl.startsWith('http')) {
+        // Absolute URL
+        fullAvatarUrl = avatarUrl;
+        hasAvatar = true;
+      }
+    }
+
+    print(
+      "🧪 [Profile] Displaying avatar | avatarUrl: $avatarUrl | fullAvatarUrl: $fullAvatarUrl | hasAvatar: $hasAvatar",
+    );
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
@@ -203,7 +225,9 @@ class _ProfileSheetState extends State<ProfileSheet> {
           // Avatar
           CircleAvatar(
             radius: 48,
-            backgroundImage: hasAvatar ? NetworkImage(avatarUrl) : null,
+            backgroundImage: hasAvatar && fullAvatarUrl != null
+                ? NetworkImage(fullAvatarUrl)
+                : null,
             backgroundColor: Colors.grey[300],
             child: !hasAvatar
                 ? Icon(Icons.person, size: 50, color: Colors.grey[600])
@@ -246,9 +270,9 @@ class _ProfileSheetState extends State<ProfileSheet> {
 
               // If changes were saved, refresh profile data
               if (result == true) {
-                setState(() {
-                  _loadProfile(); // or your existing refresh method
-                });
+                print("🧪 [Profile] Changes detected, reloading profile...");
+                setState(() => isLoading = true);
+                await _loadProfile();
               }
             },
             // ... style as before

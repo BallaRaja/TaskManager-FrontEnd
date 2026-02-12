@@ -34,17 +34,12 @@ class TaskItem extends StatelessWidget {
     Map<String, dynamic> updatedTask,
   ) {
     final controller = Provider.of<TasksController>(context, listen: false);
-    final index = controller.tasks.indexWhere((t) => t["_id"] == task["_id"]);
-    if (index != -1) {
-      controller.tasks[index] = updatedTask;
-      controller.notifyListeners();
-    }
+    controller.upsertTaskLocal(updatedTask);
   }
 
   void _removeLocalTask(BuildContext context) {
     final controller = Provider.of<TasksController>(context, listen: false);
-    controller.tasks.removeWhere((t) => t["_id"] == task["_id"]);
-    controller.notifyListeners();
+    controller.removeTaskLocal(task["_id"].toString());
   }
 
   Future<void> _toggleComplete(BuildContext context) async {

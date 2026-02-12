@@ -49,8 +49,8 @@ class _TasksPageState extends State<TasksPage> {
     return DateFormat('hh:mm a').format(_now);
   }
 
-  void _showProfileSheet(BuildContext context) {
-    showGeneralDialog(
+  void _showProfileSheet(BuildContext context) async {
+    await showGeneralDialog(
       context: context,
       barrierDismissible: true,
       barrierLabel: "Dismiss",
@@ -67,6 +67,12 @@ class _TasksPageState extends State<TasksPage> {
         );
       },
     );
+
+    // Refresh avatar after profile sheet closes
+    if (context.mounted) {
+      final controller = Provider.of<TasksController>(context, listen: false);
+      await controller.refreshAvatar();
+    }
   }
 
   void _showCreateListDialog(BuildContext context, TasksController controller) {
@@ -262,7 +268,9 @@ class _TasksPageState extends State<TasksPage> {
                       child: CircleAvatar(
                         radius: 18,
                         backgroundColor: Colors.grey[300],
-                        backgroundImage: controller.avatarUrl != null
+                        backgroundImage:
+                            controller.avatarUrl != null &&
+                                !controller.avatarUrl!.contains('placeholder')
                             ? NetworkImage(controller.avatarUrl!)
                             : null,
                         child: controller.isLoadingAvatar
@@ -273,7 +281,8 @@ class _TasksPageState extends State<TasksPage> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : controller.avatarUrl == null
+                            : (controller.avatarUrl == null ||
+                                  controller.avatarUrl!.contains('placeholder'))
                             ? const Icon(Icons.person, color: Colors.grey)
                             : null,
                       ),

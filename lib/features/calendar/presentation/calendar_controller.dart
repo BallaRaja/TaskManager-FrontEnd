@@ -43,7 +43,27 @@ class CalendarController extends ChangeNotifier {
       );
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body);
-        _avatarUrl = json["data"]?["profile"]?["avatarUrl"];
+        final rawUrl = json["data"]?["profile"]?["avatarUrl"];
+
+        // Validate and convert URL
+        if (rawUrl == null || rawUrl.isEmpty) {
+          debugPrint("🧪🧪👤 Calendar: Avatar URL is null or empty");
+          _avatarUrl = null;
+        } else if (rawUrl.contains('placeholder')) {
+          debugPrint("🧪🧪👤 Calendar: Avatar is placeholder: $rawUrl");
+          _avatarUrl = null;
+        } else if (rawUrl.startsWith('/')) {
+          // Relative URL - convert to absolute
+          _avatarUrl = "${ApiConstants.backendUrl}$rawUrl";
+          debugPrint("🧪🧪👤 Calendar: Converted relative URL to: $_avatarUrl");
+        } else if (rawUrl.startsWith('http')) {
+          // Already absolute URL
+          _avatarUrl = rawUrl;
+          debugPrint("🧪🧪👤 Calendar: Using absolute URL: $_avatarUrl");
+        } else {
+          debugPrint("🧪🧪👤 Calendar: Unknown URL format: $rawUrl");
+          _avatarUrl = null;
+        }
       }
     } catch (e) {
       debugPrint("Avatar fetch error: $e");
@@ -80,6 +100,11 @@ class CalendarController extends ChangeNotifier {
     await Future.wait([_fetchTasks(), _fetchProfileAvatar()]);
     _isLoading = false;
     notifyListeners();
+  }
+
+  // Public method to refresh avatar only
+  Future<void> refreshAvatar() async {
+    await _fetchProfileAvatar();
   }
 
   // Recurrence Logic (unchanged)

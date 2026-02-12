@@ -38,6 +38,8 @@ dependencies:
   shared_preferences: ^2.5.4
   provider: ^6.1.1
   intl: ^0.19.0
+  image_picker: ^1.0.7
+  http_parser: ^4.0.2
 
   flutter_native_timezone: ^1.1.0
   flutter_local_notifications: ^17.2.3  # Latest stable

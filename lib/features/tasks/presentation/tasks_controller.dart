@@ -1,25 +1,24 @@
 // lib/features/tasks/presentation/tasks_controller.dart
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/utils/session_manager.dart';
 
 class TasksController extends ChangeNotifier {
-  // State
   String? _avatarUrl;
   bool _isLoadingAvatar = true;
-  List<Map<String, dynamic>> _tasks = [];
-  List<Map<String, dynamic>> _taskLists = [];
+  final List<Map<String, dynamic>> _tasks = [];
+  final List<Map<String, dynamic>> _taskLists = [];
   bool _isLoading = true;
   int _selectedListIndex = 0;
 
   String? _userId;
   String? _token;
 
-  // Getters
   String? get avatarUrl => _avatarUrl;
   bool get isLoadingAvatar => _isLoadingAvatar;
   List<Map<String, dynamic>> get tasks => _tasks;
@@ -31,12 +30,10 @@ class TasksController extends ChangeNotifier {
     _token = await SessionManager.getToken();
     _userId = await SessionManager.getUserId();
 
-    print(
-      "🔑 [TasksController] Token: ${_token != null ? 'Found' : 'Missing'}",
-    );
-    print("🆔 [TasksController] UserId: $_userId");
-
     if (_token == null || _userId == null) {
+      _isLoading = false;
+      _isLoadingAvatar = false;
+      notifyListeners();
       return;
     }
 
@@ -53,142 +50,222 @@ class TasksController extends ChangeNotifier {
   Future<void> _fetchProfileAvatar() async {
     try {
       final response = await http.get(
-        Uri.parse("${ApiConstants.backendUrl}/api/profile/$_userId"),
-        headers: {"Authorization": "Bearer $_token"},
+        Uri.parse('${ApiConstants.backendUrl}/api/profile/$_userId'),
+        headers: {'Authorization': 'Bearer $_token'},
       );
-      print("👤 Profile status: ${response.statusCode}");
 
       if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        _avatarUrl = json["data"]?["profile"]?["avatarUrl"];
+        final Map<String, dynamic> json = jsonDecode(response.body);
+        final dynamic avatarUrl = json['data']?['profile']?['avatarUrl'];
+
+        print('🧪 [TasksController] Raw avatarUrl from backend: $avatarUrl');
+
+        // Handle different URL formats
+        if (avatarUrl == null ||
+            avatarUrl.toString().isEmpty ||
+            avatarUrl.toString().contains('placeholder')) {
+          _avatarUrl = null;
+          print(
+            '🧪 [TasksController] No valid avatar (null/empty/placeholder)',
+          );
+        } else if (avatarUrl.toString().startsWith('/')) {
+          _avatarUrl = '${ApiConstants.backendUrl}$avatarUrl';
+          print('🧪 [TasksController] Converted relative URL to: $_avatarUrl');
+        } else if (avatarUrl.toString().startsWith('http')) {
+          _avatarUrl = avatarUrl.toString();
+          print('🧪 [TasksController] Using absolute URL: $_avatarUrl');
+        } else {
+          _avatarUrl = null;
+          print('🧪 [TasksController] Invalid URL format: $avatarUrl');
+        }
       }
     } catch (e) {
-      print("❌ Avatar error: $e");
+      print('🧪 [TasksController] Error fetching avatar: $e');
+      _avatarUrl = null;
     } finally {
       _isLoadingAvatar = false;
       notifyListeners();
     }
   }
 
-  // In TasksController class
+  Future<void> refreshAvatar() async {
+    _isLoadingAvatar = true;
+    notifyListeners();
+    await _fetchProfileAvatar();
+  }
 
-  /// NEW: Create a new task list
   Future<void> createTaskList(String title) async {
-    if (title.trim().isEmpty) return;
+    final String trimmedTitle = title.trim();
+    if (trimmedTitle.isEmpty) return;
+
+    _token ??= await SessionManager.getToken();
+    if (_token == null) return;
 
     try {
-      final token = await SessionManager.getToken();
-      if (token == null) return;
-
       final response = await http.post(
-        Uri.parse("${ApiConstants.backendUrl}/api/taskList"),
+        Uri.parse('${ApiConstants.backendUrl}/api/taskList'),
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $token",
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
         },
-        body: jsonEncode({"title": title.trim(), "isDefault": false}),
+        body: jsonEncode({'title': trimmedTitle}),
       );
 
       if (response.statusCode == 201) {
-        await _fetchTaskLists(); // Refresh lists
-        final newList = jsonDecode(response.body)["data"];
-        final newIndex = _taskLists.indexWhere(
-          (l) => l["_id"] == newList["_id"],
-        );
-        if (newIndex != -1) {
-          _selectedListIndex = newIndex; // Auto-select the new list
+        final Map<String, dynamic> json = jsonDecode(response.body);
+        final Map<String, dynamic>? created =
+            json['data'] as Map<String, dynamic>?;
+
+        if (created != null) {
+          _taskLists.add(created);
+          _sortTaskLists();
+
+          _selectedListIndex = _taskLists.indexWhere(
+            (list) => list['_id'] == created['_id'],
+          );
+          if (_selectedListIndex < 0) {
+            _selectedListIndex = 0;
+          }
+
+          notifyListeners();
+        } else {
+          await _fetchTaskLists();
         }
-        notifyListeners();
-      } else {
-        print("Failed to create task list: ${response.body}");
       }
-    } catch (e) {
-      print("Error creating task list: $e");
-    }
+    } catch (_) {}
   }
 
   Future<void> createTask(Map<String, dynamic> taskData) async {
-    try {
-      final token = await SessionManager.getToken();
-      if (token == null) return;
+    _token ??= await SessionManager.getToken();
+    if (_token == null) return;
 
+    try {
       final response = await http.post(
-        Uri.parse("${ApiConstants.backendUrl}/api/task"),
+        Uri.parse('${ApiConstants.backendUrl}/api/task'),
         headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $token",
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
         },
         body: jsonEncode(taskData),
       );
 
       if (response.statusCode == 201) {
-        await _fetchTasks(); // Refresh tasks
-        notifyListeners();
-        print("the task you created is : ${taskData}");
-      } else {
-        print("Failed to create task: ${response.body}");
+        await _fetchTasks();
       }
-    } catch (e) {
-      print("Error creating task: $e");
+    } catch (_) {}
+  }
+
+  void upsertTaskLocal(Map<String, dynamic> updatedTask) {
+    final String? id = updatedTask['_id']?.toString();
+    if (id == null) return;
+
+    final int index = _tasks.indexWhere((t) => t['_id']?.toString() == id);
+    if (index == -1) {
+      _tasks.insert(0, updatedTask);
+    } else {
+      _tasks[index] = updatedTask;
     }
+    notifyListeners();
+  }
+
+  void removeTaskLocal(String taskId) {
+    _tasks.removeWhere((t) => t['_id']?.toString() == taskId);
+    notifyListeners();
+  }
+
+  void _sortTaskLists() {
+    _taskLists.sort((a, b) {
+      if (a['isDefault'] == true) return -1;
+      if (b['isDefault'] == true) return 1;
+
+      final DateTime dateA =
+          DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final DateTime dateB =
+          DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+
+      return dateB.compareTo(dateA);
+    });
   }
 
   Future<void> _fetchTaskLists() async {
+    _userId ??= await SessionManager.getUserId();
+    if (_userId == null) return;
+
     try {
       final response = await http.get(
-        Uri.parse("${ApiConstants.backendUrl}/api/taskList/$_userId"),
+        Uri.parse('${ApiConstants.backendUrl}/api/taskList/$_userId'),
       );
-      print("📋 TaskLists status: ${response.statusCode}");
 
       if (response.statusCode == 200) {
-        final List raw = jsonDecode(response.body)["data"] ?? [];
-        final List<Map<String, dynamic>> lists = List.from(raw);
+        final Map<String, dynamic> json = jsonDecode(response.body);
+        final List<dynamic> raw = json['data'] ?? [];
 
-        lists.sort((a, b) {
-          if (a["isDefault"] == true) return -1;
-          if (b["isDefault"] == true) return 1;
-          return DateTime.parse(
-            b["createdAt"],
-          ).compareTo(DateTime.parse(a["createdAt"]));
-        });
+        _taskLists
+          ..clear()
+          ..addAll(raw.cast<Map<String, dynamic>>());
 
-        _taskLists = lists;
-        _selectedListIndex = 0;
+        _sortTaskLists();
+
+        if (_taskLists.isEmpty) {
+          _selectedListIndex = 0;
+        } else if (_selectedListIndex >= _taskLists.length) {
+          _selectedListIndex = _taskLists.length - 1;
+        }
+
         notifyListeners();
       }
-    } catch (e) {
-      print("❌ TaskLists error: $e");
-    }
+    } catch (_) {}
   }
 
   Future<void> _fetchTasks() async {
+    _token ??= await SessionManager.getToken();
+    if (_token == null) return;
+
     try {
       final response = await http.get(
-        Uri.parse("${ApiConstants.backendUrl}/api/task"),
-        headers: {"Authorization": "Bearer $_token"},
+        Uri.parse('${ApiConstants.backendUrl}/api/task'),
+        headers: {'Authorization': 'Bearer $_token'},
       );
-      print("✅ Tasks status: ${response.statusCode}");
 
       if (response.statusCode == 200) {
-        final List raw = jsonDecode(response.body)["data"] ?? [];
-        _tasks = List<Map<String, dynamic>>.from(raw);
+        final Map<String, dynamic> json = jsonDecode(response.body);
+        final List<dynamic> raw = json['data'] ?? [];
+
+        _tasks
+          ..clear()
+          ..addAll(raw.cast<Map<String, dynamic>>());
+
         notifyListeners();
       }
-    } catch (e) {
-      print("❌ Tasks error: $e");
-    }
+    } catch (_) {}
   }
 
   void selectList(int index) {
-    if (index != _selectedListIndex && index < _taskLists.length) {
-      _selectedListIndex = index;
-      notifyListeners();
-    }
+    if (index < 0 || index >= _taskLists.length) return;
+    if (_selectedListIndex == index) return;
+
+    _selectedListIndex = index;
+    notifyListeners();
   }
 
   Future<void> refresh() async {
     _isLoading = true;
     notifyListeners();
-    await init();
+
+    _token = await SessionManager.getToken();
+    _userId = await SessionManager.getUserId();
+
+    if (_token == null || _userId == null) {
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
+
+    await Future.wait([_fetchTaskLists(), _fetchTasks()]);
+
+    _isLoading = false;
+    notifyListeners();
   }
 }
