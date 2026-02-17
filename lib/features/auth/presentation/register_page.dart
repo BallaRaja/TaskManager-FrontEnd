@@ -8,7 +8,7 @@ class _WaveClipper extends CustomClipper<Path> {
   Path getClip(Size size) {
     var path = Path();
     path.lineTo(0, size.height - 60);
-    
+
     var firstControlPoint = Offset(size.width / 4, size.height);
     var firstEndPoint = Offset(size.width / 2, size.height - 30);
     path.quadraticBezierTo(
@@ -17,7 +17,7 @@ class _WaveClipper extends CustomClipper<Path> {
       firstEndPoint.dx,
       firstEndPoint.dy,
     );
-    
+
     var secondControlPoint = Offset(size.width * 3 / 4, size.height - 60);
     var secondEndPoint = Offset(size.width, size.height - 20);
     path.quadraticBezierTo(
@@ -26,7 +26,7 @@ class _WaveClipper extends CustomClipper<Path> {
       secondEndPoint.dx,
       secondEndPoint.dy,
     );
-    
+
     path.lineTo(size.width, 0);
     path.close();
     return path;
@@ -44,26 +44,65 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  final nameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
+  final confirmPasswordController = TextEditingController();
   final auth = AuthController();
 
   bool loading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+
+  Future<void> _showErrorPopup(String message) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Registration Error"),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("OK"),
+          ),
+        ],
+      ),
+    );
+  }
 
   void register() async {
     print("🟡 [RegisterPage] Register button pressed");
 
+    final name = nameController.text.trim();
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+    final confirmPassword = confirmPasswordController.text;
+
+    if (name.isEmpty ||
+        email.isEmpty ||
+        password.isEmpty ||
+        confirmPassword.isEmpty) {
+      await _showErrorPopup(
+        "Name, email, password and confirm password are required",
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      await _showErrorPopup("Password and confirm password do not match");
+      return;
+    }
+
     setState(() => loading = true);
 
     try {
-      final success = await auth.register(
-        emailController.text,
-        passwordController.text,
-      );
+      final success = await auth.register(name, email, password);
 
       print("🟢 [RegisterPage] Register success: $success");
 
       if (success) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Registration successful. Please login."),
@@ -75,22 +114,32 @@ class _RegisterPageState extends State<RegisterPage> {
           MaterialPageRoute(builder: (_) => const LoginPage()),
         );
       } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Registration Failed")));
+        await _showErrorPopup("Registration failed");
       }
     } catch (e) {
       print("❌ [RegisterPage] Exception: $e");
+      await _showErrorPopup(e.toString().replaceFirst("Exception: ", ""));
     } finally {
       print("🔵 [RegisterPage] Loading false");
-      setState(() => loading = false);
+      if (mounted) {
+        setState(() => loading = false);
+      }
     }
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
-    
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SingleChildScrollView(
@@ -105,10 +154,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [
-                      const Color(0xFF5B6DEE),
-                      const Color(0xFF4D5FDE),
-                    ],
+                    colors: [const Color(0xFF5B6DEE), const Color(0xFF4D5FDE)],
                   ),
                 ),
                 child: Stack(
@@ -140,14 +186,48 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
               ),
             ),
-            
+
             // Form section
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Column(
                 children: [
                   const SizedBox(height: 40),
-                  
+
+                  // Name Field
+                  TextField(
+                    controller: nameController,
+                    keyboardType: TextInputType.name,
+                    style: TextStyle(fontSize: 16),
+                    decoration: InputDecoration(
+                      labelText: 'Name',
+                      labelStyle: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                      ),
+                      hintText: 'Your name',
+                      hintStyle: TextStyle(
+                        color: Colors.blue.shade400,
+                        fontSize: 16,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.person_outline,
+                        color: Colors.blue.shade600,
+                        size: 22,
+                      ),
+                      enabledBorder: UnderlineInputBorder(
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: UnderlineInputBorder(
+                        borderSide: BorderSide(
+                          color: Colors.blue.shade600,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
                   // Email Field
                   TextField(
                     controller: emailController,
@@ -181,11 +261,11 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Password Field
                   TextField(
                     controller: passwordController,
-                    obscureText: true,
+                    obscureText: _obscurePassword,
                     style: TextStyle(fontSize: 16),
                     decoration: InputDecoration(
                       labelText: 'Password',
@@ -204,10 +284,67 @@ class _RegisterPageState extends State<RegisterPage> {
                         color: Colors.blue.shade600,
                         size: 22,
                       ),
-                      suffixIcon: Icon(
-                        Icons.visibility_off_outlined,
+                      suffixIcon: IconButton(
+                        onPressed: () {
+                          setState(() => _obscurePassword = !_obscurePassword);
+                        },
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color: Colors.grey.shade400,
+                          size: 22,
+                        ),
+                      ),
+                      enabledBorder: UnderlineInputBorder(
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: UnderlineInputBorder(
+                        borderSide: BorderSide(
+                          color: Colors.blue.shade600,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Confirm Password Field
+                  TextField(
+                    controller: confirmPasswordController,
+                    obscureText: _obscureConfirmPassword,
+                    style: TextStyle(fontSize: 16),
+                    decoration: InputDecoration(
+                      labelText: 'Confirm Password',
+                      labelStyle: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                      ),
+                      hintText: '••••••',
+                      hintStyle: TextStyle(
                         color: Colors.grey.shade400,
+                        fontSize: 20,
+                        letterSpacing: 4,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.lock_outline,
+                        color: Colors.blue.shade600,
                         size: 22,
+                      ),
+                      suffixIcon: IconButton(
+                        onPressed: () {
+                          setState(
+                            () => _obscureConfirmPassword =
+                                !_obscureConfirmPassword,
+                          );
+                        },
+                        icon: Icon(
+                          _obscureConfirmPassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color: Colors.grey.shade400,
+                          size: 22,
+                        ),
                       ),
                       enabledBorder: UnderlineInputBorder(
                         borderSide: BorderSide(color: Colors.grey.shade300),
@@ -221,7 +358,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                   const SizedBox(height: 48),
-                  
+
                   // Register Button
                   SizedBox(
                     width: double.infinity,
@@ -253,7 +390,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Sign In Link
                   TextButton(
                     onPressed: () => Navigator.pop(context),

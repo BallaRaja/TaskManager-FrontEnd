@@ -10,7 +10,7 @@ class WaveClipper extends CustomClipper<Path> {
   Path getClip(Size size) {
     var path = Path();
     path.lineTo(0, size.height - 60);
-    
+
     var firstControlPoint = Offset(size.width / 4, size.height);
     var firstEndPoint = Offset(size.width / 2, size.height - 30);
     path.quadraticBezierTo(
@@ -19,7 +19,7 @@ class WaveClipper extends CustomClipper<Path> {
       firstEndPoint.dx,
       firstEndPoint.dy,
     );
-    
+
     var secondControlPoint = Offset(size.width * 3 / 4, size.height - 60);
     var secondEndPoint = Offset(size.width, size.height - 20);
     path.quadraticBezierTo(
@@ -28,7 +28,7 @@ class WaveClipper extends CustomClipper<Path> {
       secondEndPoint.dx,
       secondEndPoint.dy,
     );
-    
+
     path.lineTo(size.width, 0);
     path.close();
     return path;
@@ -51,6 +51,24 @@ class _LoginPageState extends State<LoginPage> {
   final auth = AuthController();
 
   bool loading = false;
+  bool _obscurePassword = true;
+
+  Future<void> _showErrorPopup(String message) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Login Error"),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("OK"),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> login() async {
     if (loading) return; // prevent double tap
@@ -59,9 +77,7 @@ class _LoginPageState extends State<LoginPage> {
     final password = passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Email and password are required")),
-      );
+      _showErrorPopup("Email and password are required");
       return;
     }
 
@@ -90,15 +106,11 @@ class _LoginPageState extends State<LoginPage> {
           MaterialPageRoute(builder: (_) => const MyApp()),
         );
       } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Invalid login response")));
+        await _showErrorPopup("Invalid login response");
       }
     } catch (e) {
       print("❌ [LoginPage] Exception: $e");
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Login failed")));
+      await _showErrorPopup(e.toString().replaceFirst("Exception: ", ""));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -107,7 +119,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
-    
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SingleChildScrollView(
@@ -122,10 +134,7 @@ class _LoginPageState extends State<LoginPage> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [
-                      const Color(0xFF5B6DEE),
-                      const Color(0xFF4D5FDE),
-                    ],
+                    colors: [const Color(0xFF5B6DEE), const Color(0xFF4D5FDE)],
                   ),
                 ),
                 child: Center(
@@ -143,14 +152,14 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
             ),
-            
+
             // Form section
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Column(
                 children: [
                   const SizedBox(height: 40),
-                  
+
                   // Email Field
                   TextField(
                     controller: emailController,
@@ -184,11 +193,11 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // Password Field
                   TextField(
                     controller: passwordController,
-                    obscureText: true,
+                    obscureText: _obscurePassword,
                     style: TextStyle(fontSize: 16),
                     decoration: InputDecoration(
                       labelText: 'Password',
@@ -207,10 +216,17 @@ class _LoginPageState extends State<LoginPage> {
                         color: Colors.blue.shade600,
                         size: 22,
                       ),
-                      suffixIcon: Icon(
-                        Icons.visibility_off_outlined,
-                        color: Colors.grey.shade400,
-                        size: 22,
+                      suffixIcon: IconButton(
+                        onPressed: () {
+                          setState(() => _obscurePassword = !_obscurePassword);
+                        },
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color: Colors.grey.shade400,
+                          size: 22,
+                        ),
                       ),
                       enabledBorder: UnderlineInputBorder(
                         borderSide: BorderSide(color: Colors.grey.shade300),
@@ -224,7 +240,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Forgot Password
                   Align(
                     alignment: Alignment.centerRight,
@@ -247,7 +263,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 32),
-                  
+
                   // Login Button
                   SizedBox(
                     width: double.infinity,
@@ -279,7 +295,7 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Sign Up Button
                   SizedBox(
                     width: double.infinity,

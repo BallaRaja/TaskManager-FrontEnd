@@ -60,33 +60,46 @@ class AuthApi {
         return data;
       }
 
-      return null;
+      final data = jsonDecode(res.body);
+      throw Exception(data["error"] ?? "Login failed");
     } catch (e) {
       print("❌ [AuthApi] Login exception: $e");
-      return null;
+      throw Exception(e.toString().replaceFirst("Exception: ", ""));
     }
   }
 
   /// 📝 Register user (no JWT here)
-  static Future<bool> register(String email, String password) async {
+  static Future<bool> register(
+    String name,
+    String email,
+    String password,
+  ) async {
     print("➡️ [AuthApi] REGISTER called");
+    print("👤 Name: $name");
     print("📧 Email: $email");
 
     try {
       final res = await http.post(
         Uri.parse("${ApiConstants.baseUrl}/register"),
         headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"email": email, "password": password}),
+        body: jsonEncode({"name": name, "email": email, "password": password}),
       );
 
       print("⬅️ [AuthApi] REGISTER response code: ${res.statusCode}");
       print("📦 Response body: ${res.body}");
 
       // ✅ ACCEPT 201 (Created)
-      return res.statusCode == 201;
+      if (res.statusCode == 201) {
+        return true;
+      }
+
+      final data = jsonDecode(res.body);
+      throw Exception(
+        data["error"] ?? data["message"] ?? "Registration failed",
+      );
     } catch (e) {
       print("❌ [AuthApi] REGISTER exception: $e");
-      return false;
+      throw Exception(e.toString().replaceFirst("Exception: ", ""));
     }
   }
 }
