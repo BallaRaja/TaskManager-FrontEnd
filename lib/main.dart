@@ -53,13 +53,22 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  Future<void> _onThemeChanged(bool isDarkMode) async {
+    await AppTheme.saveTheme(isDarkMode);
+    if (mounted) {
+      setState(() {
+        _isDarkMode = isDarkMode;
+      });
+    }
+  }
+
   Future<Widget> _decideStartPage() async {
     final token = await SessionManager.getToken();
     final savedUserId = await SessionManager.getUserId();
 
     if (token == null || token.isEmpty) {
       debugPrint("No token found → Redirecting to Login");
-      return const LoginPage();
+      return LoginPage(onThemeChanged: _onThemeChanged);
     }
 
     try {
@@ -84,13 +93,13 @@ class _MyAppState extends State<MyApp> {
           await NotificationService().scheduleAllNotifications();
         }
 
-        return MainAppShell(userId: userId);
+        return MainAppShell(userId: userId, onThemeChanged: _onThemeChanged);
       }
 
       final unauthorized = result != null && result["unauthorized"] == true;
       if (unauthorized) {
         await SessionManager.clearSession();
-        return const LoginPage();
+        return LoginPage(onThemeChanged: _onThemeChanged);
       }
     } catch (e) {
       debugPrint("Session verification failed: $e");
@@ -99,7 +108,10 @@ class _MyAppState extends State<MyApp> {
         debugPrint(
           "Using cached session after verify failure for user: $savedUserId",
         );
-        return MainAppShell(userId: savedUserId);
+        return MainAppShell(
+          userId: savedUserId,
+          onThemeChanged: _onThemeChanged,
+        );
       }
     }
 
@@ -107,11 +119,11 @@ class _MyAppState extends State<MyApp> {
       debugPrint(
         "Verify unavailable → keeping cached session for user: $savedUserId",
       );
-      return MainAppShell(userId: savedUserId);
+      return MainAppShell(userId: savedUserId, onThemeChanged: _onThemeChanged);
     }
 
     await SessionManager.clearSession();
-    return const LoginPage();
+    return LoginPage(onThemeChanged: _onThemeChanged);
   }
 
   @override
@@ -152,8 +164,13 @@ class _MyAppState extends State<MyApp> {
 
 class MainAppShell extends StatefulWidget {
   final String userId;
+  final ValueChanged<bool> onThemeChanged;
 
-  const MainAppShell({super.key, required this.userId});
+  const MainAppShell({
+    super.key,
+    required this.userId,
+    required this.onThemeChanged,
+  });
 
   @override
   State<MainAppShell> createState() => _MainAppShellState();
@@ -162,7 +179,11 @@ class MainAppShell extends StatefulWidget {
 class _MainAppShellState extends State<MainAppShell> {
   int _selectedIndex = 0; // Start on Tasks tab
 
-  final List<Widget> _pages = const [TasksPage(), AIChatPage(), CalendarPage()];
+  late final List<Widget> _pages = [
+    TasksPage(onThemeChanged: widget.onThemeChanged),
+    const AIChatPage(),
+    const CalendarPage(),
+  ];
 
   void _onItemTapped(int index) {
     setState(() {

@@ -1,6 +1,7 @@
 import 'package:client/features/auth/presentation/login_page.dart';
 import 'package:flutter/material.dart';
 import '../logic/auth_controller.dart';
+import '../../../core/theme/app_theme.dart';
 
 // Custom wave clipper for the top section
 class _WaveClipper extends CustomClipper<Path> {
@@ -37,7 +38,9 @@ class _WaveClipper extends CustomClipper<Path> {
 }
 
 class RegisterPage extends StatefulWidget {
-  const RegisterPage({super.key});
+  final ValueChanged<bool>? onThemeChanged;
+
+  const RegisterPage({super.key, this.onThemeChanged});
 
   @override
   State<RegisterPage> createState() => _RegisterPageState();
@@ -111,7 +114,9 @@ class _RegisterPageState extends State<RegisterPage> {
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const LoginPage()),
+          MaterialPageRoute(
+            builder: (_) => LoginPage(onThemeChanged: widget.onThemeChanged),
+          ),
         );
       } else {
         await _showErrorPopup("Registration failed");
@@ -139,9 +144,25 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inputTextColor = isDark
+        ? AppTheme.darkTextPrimary
+        : AppTheme.lightTextPrimary;
+    final inputSecondaryColor = isDark
+        ? AppTheme.darkTextSecondary
+        : AppTheme.lightTextSecondary;
+    final borderColor = isDark
+        ? AppTheme.darkInactiveIcons
+        : AppTheme.lightInactiveIcons;
+    final headerStartColor = isDark
+        ? const Color(0xFF2A2342)
+        : const Color(0xFF5B6DEE);
+    final headerEndColor = isDark
+        ? const Color(0xFF1E1A2B)
+        : const Color(0xFF4D5FDE);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -154,7 +175,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [const Color(0xFF5B6DEE), const Color(0xFF4D5FDE)],
+                    colors: [headerStartColor, headerEndColor],
                   ),
                 ),
                 child: Stack(
@@ -198,29 +219,29 @@ class _RegisterPageState extends State<RegisterPage> {
                   TextField(
                     controller: nameController,
                     keyboardType: TextInputType.name,
-                    style: TextStyle(fontSize: 16),
+                    style: TextStyle(fontSize: 16, color: inputTextColor),
                     decoration: InputDecoration(
                       labelText: 'Name',
                       labelStyle: TextStyle(
-                        color: Colors.grey.shade600,
+                        color: inputSecondaryColor,
                         fontSize: 14,
                       ),
                       hintText: 'Your name',
                       hintStyle: TextStyle(
-                        color: Colors.blue.shade400,
+                        color: inputSecondaryColor,
                         fontSize: 16,
                       ),
                       prefixIcon: Icon(
                         Icons.person_outline,
-                        color: Colors.blue.shade600,
+                        color: Theme.of(context).colorScheme.primary,
                         size: 22,
                       ),
                       enabledBorder: UnderlineInputBorder(
-                        borderSide: BorderSide(color: Colors.grey.shade300),
+                        borderSide: BorderSide(color: borderColor),
                       ),
                       focusedBorder: UnderlineInputBorder(
                         borderSide: BorderSide(
-                          color: Colors.blue.shade600,
+                          color: Theme.of(context).colorScheme.primary,
                           width: 2,
                         ),
                       ),
@@ -232,29 +253,29 @@ class _RegisterPageState extends State<RegisterPage> {
                   TextField(
                     controller: emailController,
                     keyboardType: TextInputType.emailAddress,
-                    style: TextStyle(fontSize: 16),
+                    style: TextStyle(fontSize: 16, color: inputTextColor),
                     decoration: InputDecoration(
                       labelText: 'Email',
                       labelStyle: TextStyle(
-                        color: Colors.grey.shade600,
+                        color: inputSecondaryColor,
                         fontSize: 14,
                       ),
                       hintText: 'test@gmail.com',
                       hintStyle: TextStyle(
-                        color: Colors.blue.shade400,
+                        color: inputSecondaryColor,
                         fontSize: 16,
                       ),
                       prefixIcon: Icon(
                         Icons.email_outlined,
-                        color: Colors.blue.shade600,
+                        color: Theme.of(context).colorScheme.primary,
                         size: 22,
                       ),
                       enabledBorder: UnderlineInputBorder(
-                        borderSide: BorderSide(color: Colors.grey.shade300),
+                        borderSide: BorderSide(color: borderColor),
                       ),
                       focusedBorder: UnderlineInputBorder(
                         borderSide: BorderSide(
-                          color: Colors.blue.shade600,
+                          color: Theme.of(context).colorScheme.primary,
                           width: 2,
                         ),
                       ),
@@ -266,22 +287,22 @@ class _RegisterPageState extends State<RegisterPage> {
                   TextField(
                     controller: passwordController,
                     obscureText: _obscurePassword,
-                    style: TextStyle(fontSize: 16),
+                    style: TextStyle(fontSize: 16, color: inputTextColor),
                     decoration: InputDecoration(
                       labelText: 'Password',
                       labelStyle: TextStyle(
-                        color: Colors.grey.shade600,
+                        color: inputSecondaryColor,
                         fontSize: 14,
                       ),
                       hintText: '••••••',
                       hintStyle: TextStyle(
-                        color: Colors.grey.shade400,
+                        color: inputSecondaryColor,
                         fontSize: 20,
                         letterSpacing: 4,
                       ),
                       prefixIcon: Icon(
                         Icons.lock_outline,
-                        color: Colors.blue.shade600,
+                        color: Theme.of(context).colorScheme.primary,
                         size: 22,
                       ),
                       suffixIcon: IconButton(
@@ -292,16 +313,16 @@ class _RegisterPageState extends State<RegisterPage> {
                           _obscurePassword
                               ? Icons.visibility_off_outlined
                               : Icons.visibility_outlined,
-                          color: Colors.grey.shade400,
+                          color: inputSecondaryColor,
                           size: 22,
                         ),
                       ),
                       enabledBorder: UnderlineInputBorder(
-                        borderSide: BorderSide(color: Colors.grey.shade300),
+                        borderSide: BorderSide(color: borderColor),
                       ),
                       focusedBorder: UnderlineInputBorder(
                         borderSide: BorderSide(
-                          color: Colors.blue.shade600,
+                          color: Theme.of(context).colorScheme.primary,
                           width: 2,
                         ),
                       ),
@@ -313,22 +334,22 @@ class _RegisterPageState extends State<RegisterPage> {
                   TextField(
                     controller: confirmPasswordController,
                     obscureText: _obscureConfirmPassword,
-                    style: TextStyle(fontSize: 16),
+                    style: TextStyle(fontSize: 16, color: inputTextColor),
                     decoration: InputDecoration(
                       labelText: 'Confirm Password',
                       labelStyle: TextStyle(
-                        color: Colors.grey.shade600,
+                        color: inputSecondaryColor,
                         fontSize: 14,
                       ),
                       hintText: '••••••',
                       hintStyle: TextStyle(
-                        color: Colors.grey.shade400,
+                        color: inputSecondaryColor,
                         fontSize: 20,
                         letterSpacing: 4,
                       ),
                       prefixIcon: Icon(
                         Icons.lock_outline,
-                        color: Colors.blue.shade600,
+                        color: Theme.of(context).colorScheme.primary,
                         size: 22,
                       ),
                       suffixIcon: IconButton(
@@ -342,16 +363,16 @@ class _RegisterPageState extends State<RegisterPage> {
                           _obscureConfirmPassword
                               ? Icons.visibility_off_outlined
                               : Icons.visibility_outlined,
-                          color: Colors.grey.shade400,
+                          color: inputSecondaryColor,
                           size: 22,
                         ),
                       ),
                       enabledBorder: UnderlineInputBorder(
-                        borderSide: BorderSide(color: Colors.grey.shade300),
+                        borderSide: BorderSide(color: borderColor),
                       ),
                       focusedBorder: UnderlineInputBorder(
                         borderSide: BorderSide(
-                          color: Colors.blue.shade600,
+                          color: Theme.of(context).colorScheme.primary,
                           width: 2,
                         ),
                       ),
@@ -366,13 +387,15 @@ class _RegisterPageState extends State<RegisterPage> {
                     child: loading
                         ? Center(
                             child: CircularProgressIndicator(
-                              color: Colors.blue.shade600,
+                              color: Theme.of(context).colorScheme.primary,
                             ),
                           )
                         : ElevatedButton(
                             onPressed: register,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF5B6DEE),
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
                               foregroundColor: Colors.white,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
@@ -398,14 +421,14 @@ class _RegisterPageState extends State<RegisterPage> {
                       text: TextSpan(
                         text: "Already have an account? ",
                         style: TextStyle(
-                          color: Colors.grey.shade600,
+                          color: inputSecondaryColor,
                           fontSize: 14,
                         ),
                         children: [
                           TextSpan(
                             text: 'Sign In',
                             style: TextStyle(
-                              color: const Color(0xFF5B6DEE),
+                              color: Theme.of(context).colorScheme.primary,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
