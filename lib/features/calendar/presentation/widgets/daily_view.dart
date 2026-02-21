@@ -30,7 +30,16 @@ class DailyView extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           ...overdue.map((t) => TaskItem(task: t, isCompleted: false)),
-          const Divider(height: 32),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Divider(
+              height: 1,
+              thickness: 1,
+              color: Colors.grey.withOpacity(0.35),
+            ),
+          ),
+          const SizedBox(height: 12),
         ],
         Text(
           "Today — ${DateFormat('EEEE, MMM d').format(controller.selectedDate)}",
@@ -40,7 +49,16 @@ class DailyView extends StatelessWidget {
         ...todayTasks.map(
           (t) => TaskItem(task: t, isCompleted: t["status"] == "completed"),
         ),
-        const Divider(height: 40),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Colors.grey.withOpacity(0.35),
+          ),
+        ),
+        const SizedBox(height: 12),
         Text(
           "Tomorrow — ${DateFormat('EEEE, MMM d').format(tomorrow)}",
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),

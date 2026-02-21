@@ -21,6 +21,7 @@ class MonthlyView extends StatelessWidget {
     final controller = Provider.of<CalendarController>(context);
     final media = MediaQuery.of(context);
     final isSmallScreen = media.size.width < 360;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final DateTime focusedMonth = DateTime(
       controller.selectedDate.year,
@@ -60,25 +61,25 @@ class MonthlyView extends StatelessWidget {
               children: [
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  width: isSmallScreen ? 32 : 38,
-                  height: isSmallScreen ? 32 : 38,
+                  width: isSmallScreen ? 32 : 36,
+                  height: isSmallScreen ? 32 : 36,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isSelected ? Colors.purple : Colors.transparent,
+                    color: isSelected
+                        ? Colors.purple
+                        : (isDark
+                              ? Colors.white.withOpacity(0.08)
+                              : Colors.grey.withOpacity(0.12)),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   alignment: Alignment.center,
                   child: Text(
                     day.toString(),
                     style: TextStyle(
-                      fontSize: isSmallScreen ? 12 : 14,
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+                      fontSize: isSmallScreen ? 12 : 13,
+                      fontWeight: FontWeight.normal,
                       color: isSelected
                           ? Colors.white
-                          : (Theme.of(context).brightness == Brightness.dark
-                                ? Colors.white
-                                : Colors.black87),
+                          : (isDark ? Colors.white : Colors.black87),
                     ),
                   ),
                 ),
@@ -110,6 +111,7 @@ class MonthlyView extends StatelessWidget {
           onHorizontalDragEnd: (details) {
             final velocity = details.primaryVelocity ?? 0;
             if (velocity < -100) {
+              // swipe left → next month
               controller.setSelectedDate(
                 DateTime(
                   controller.selectedDate.year,
@@ -118,6 +120,7 @@ class MonthlyView extends StatelessWidget {
                 ),
               );
             } else if (velocity > 100) {
+              // swipe right → previous month
               controller.setSelectedDate(
                 DateTime(
                   controller.selectedDate.year,
@@ -214,7 +217,12 @@ class MonthlyView extends StatelessWidget {
           ),
         ),
 
-        const Divider(height: 1),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Divider(height: 1, thickness: 1, color: Colors.grey.withOpacity(0.35)),
+        ),
+        const SizedBox(height: 4),
 
         // ───── Selected Day Header ─────
         Padding(

@@ -116,18 +116,27 @@ class WeeklyView extends StatelessWidget {
                     onTap: () => controller.setSelectedDate(date),
                     child: Column(
                       children: [
-                        CircleAvatar(
-                          radius: 18,
-                          backgroundColor: isSelected
-                              ? Colors.purple
-                              : Colors.transparent,
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Colors.purple
+                                : (isDark
+                                      ? Colors.white.withOpacity(0.08)
+                                      : Colors.grey.withOpacity(0.12)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          alignment: Alignment.center,
                           child: Text(
                             date.day.toString(),
                             style: TextStyle(
                               color: isSelected
                                   ? Colors.white
-                                  : (isDark ? Colors.white : Colors.black),
-                              fontWeight: FontWeight.bold,
+                                  : (isDark ? Colors.white : Colors.black87),
+                              fontWeight: FontWeight.normal,
+                              fontSize: 13,
                             ),
                           ),
                         ),
@@ -150,7 +159,16 @@ class WeeklyView extends StatelessWidget {
             ),
           ),
         ),
-        const Divider(height: 32),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Colors.grey.withOpacity(0.35),
+          ),
+        ),
+        const SizedBox(height: 16),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Align(
