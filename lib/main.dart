@@ -35,10 +35,12 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   bool _isDarkMode = false;
+  late Future<Widget> _startPageFuture;
 
   @override
   void initState() {
     super.initState();
+    _startPageFuture = _decideStartPage();
     _loadTheme();
   }
 
@@ -53,6 +55,7 @@ class _MyAppState extends State<MyApp> {
 
   Future<Widget> _decideStartPage() async {
     final token = await SessionManager.getToken();
+    final savedUserId = await SessionManager.getUserId();
 
     if (token == null || token.isEmpty) {
       debugPrint("No token found → Redirecting to Login");
@@ -65,7 +68,7 @@ class _MyAppState extends State<MyApp> {
       ).timeout(const Duration(seconds: 10));
 
       if (result != null && result["valid"] == true) {
-        final userId = result["userId"] as String;
+        final userId = result["userId"].toString();
 
         // Save complete session
         await SessionManager.saveFullSession(
@@ -83,11 +86,30 @@ class _MyAppState extends State<MyApp> {
 
         return MainAppShell(userId: userId);
       }
+
+      final unauthorized = result != null && result["unauthorized"] == true;
+      if (unauthorized) {
+        await SessionManager.clearSession();
+        return const LoginPage();
+      }
     } catch (e) {
       debugPrint("Session verification failed: $e");
+
+      if (savedUserId != null && savedUserId.isNotEmpty) {
+        debugPrint(
+          "Using cached session after verify failure for user: $savedUserId",
+        );
+        return MainAppShell(userId: savedUserId);
+      }
     }
 
-    // Invalid or expired token → clear and go to login
+    if (savedUserId != null && savedUserId.isNotEmpty) {
+      debugPrint(
+        "Verify unavailable → keeping cached session for user: $savedUserId",
+      );
+      return MainAppShell(userId: savedUserId);
+    }
+
     await SessionManager.clearSession();
     return const LoginPage();
   }
@@ -101,7 +123,7 @@ class _MyAppState extends State<MyApp> {
       darkTheme: AppTheme.darkTheme,
       themeMode: _isDarkMode ? ThemeMode.dark : ThemeMode.light,
       home: FutureBuilder<Widget>(
-        future: _decideStartPage(),
+        future: _startPageFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Scaffold(

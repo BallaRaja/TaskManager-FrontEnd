@@ -89,21 +89,25 @@ class _LoginPageState extends State<LoginPage> {
 
       print("🟢 [LoginPage] Login result: $result");
 
+      final userId = result?["userId"]?.toString();
+
       if (result != null &&
           result["token"] != null &&
-          result["userId"] != null) {
+          userId != null &&
+          userId.isNotEmpty) {
         await SessionManager.saveFullSession(
           result["token"], // JWT token
           email, // user email
-          result["userId"], // userId from backend
+          userId, // userId from backend
         );
 
         print("✅ [LoginPage] Session saved");
 
         if (!mounted) return;
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const MyApp()),
+          MaterialPageRoute(builder: (_) => MainAppShell(userId: userId)),
+          (route) => false,
         );
       } else {
         await _showErrorPopup("Invalid login response");

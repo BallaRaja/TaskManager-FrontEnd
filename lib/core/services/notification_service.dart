@@ -1,7 +1,7 @@
 import 'package:client/core/utils/session_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter_native_timezone/flutter_native_timezone.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:http/http.dart' as http;
@@ -23,7 +23,7 @@ class NotificationService {
 
     String timeZoneName;
     try {
-      timeZoneName = await FlutterNativeTimezone.getLocalTimezone();
+      timeZoneName = await FlutterTimezone.getLocalTimezone();
     } catch (e) {
       // Fallback for desktop platforms (Linux/macOS/Windows) or any error
       debugPrint(
