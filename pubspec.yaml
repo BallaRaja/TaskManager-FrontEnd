@@ -41,8 +41,8 @@ dependencies:
   image_picker: ^1.0.7
   http_parser: ^4.0.2
 
-  flutter_native_timezone: ^1.1.0
-  flutter_local_notifications: ^17.2.3  # Latest stable
+  flutter_timezone: ^4.1.1
+  flutter_local_notifications: ^17.2.4
   timezone: ^0.9.4
 
 dev_dependencies:

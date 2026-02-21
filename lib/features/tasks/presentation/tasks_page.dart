@@ -14,8 +14,13 @@ import 'widgets/completed_section.dart';
 
 class TasksPage extends StatefulWidget {
   final TaskViewType initialViewType;
+  final ValueChanged<bool>? onThemeChanged;
 
-  const TasksPage({super.key, this.initialViewType = TaskViewType.normal});
+  const TasksPage({
+    super.key,
+    this.initialViewType = TaskViewType.normal,
+    this.onThemeChanged,
+  });
 
   @override
   State<TasksPage> createState() => _TasksPageState();
@@ -56,7 +61,8 @@ class _TasksPageState extends State<TasksPage> {
       barrierLabel: "Dismiss",
       barrierColor: Colors.black.withOpacity(0.5),
       transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (_, __, ___) => const ProfileSheet(),
+      pageBuilder: (_, __, ___) =>
+          ProfileSheet(onThemeChanged: widget.onThemeChanged),
       transitionBuilder: (_, anim, __, child) {
         return SlideTransition(
           position: Tween(

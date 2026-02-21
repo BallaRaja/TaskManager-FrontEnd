@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../logic/auth_controller.dart';
 import 'register_page.dart';
 import '../../../core/utils/session_manager.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../main.dart';
 
 // Custom wave clipper for the top section
@@ -39,7 +40,9 @@ class WaveClipper extends CustomClipper<Path> {
 }
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  final ValueChanged<bool>? onThemeChanged;
+
+  const LoginPage({super.key, this.onThemeChanged});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -89,21 +92,30 @@ class _LoginPageState extends State<LoginPage> {
 
       print("🟢 [LoginPage] Login result: $result");
 
+      final userId = result?["userId"]?.toString();
+
       if (result != null &&
           result["token"] != null &&
-          result["userId"] != null) {
+          userId != null &&
+          userId.isNotEmpty) {
         await SessionManager.saveFullSession(
           result["token"], // JWT token
           email, // user email
-          result["userId"], // userId from backend
+          userId, // userId from backend
         );
 
         print("✅ [LoginPage] Session saved");
 
         if (!mounted) return;
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const MyApp()),
+          MaterialPageRoute(
+            builder: (_) => MainAppShell(
+              userId: userId,
+              onThemeChanged: widget.onThemeChanged ?? (_) {},
+            ),
+          ),
+          (route) => false,
         );
       } else {
         await _showErrorPopup("Invalid login response");
@@ -119,9 +131,25 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inputTextColor = isDark
+        ? AppTheme.darkTextPrimary
+        : AppTheme.lightTextPrimary;
+    final inputSecondaryColor = isDark
+        ? AppTheme.darkTextSecondary
+        : AppTheme.lightTextSecondary;
+    final borderColor = isDark
+        ? AppTheme.darkInactiveIcons
+        : AppTheme.lightInactiveIcons;
+    final headerStartColor = isDark
+        ? const Color(0xFF2A2342)
+        : const Color(0xFF5B6DEE);
+    final headerEndColor = isDark
+        ? const Color(0xFF1E1A2B)
+        : const Color(0xFF4D5FDE);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -134,7 +162,7 @@ class _LoginPageState extends State<LoginPage> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [const Color(0xFF5B6DEE), const Color(0xFF4D5FDE)],
+                    colors: [headerStartColor, headerEndColor],
                   ),
                 ),
                 child: Center(
@@ -164,29 +192,29 @@ class _LoginPageState extends State<LoginPage> {
                   TextField(
                     controller: emailController,
                     keyboardType: TextInputType.emailAddress,
-                    style: TextStyle(fontSize: 16),
+                    style: TextStyle(fontSize: 16, color: inputTextColor),
                     decoration: InputDecoration(
                       labelText: 'Email',
                       labelStyle: TextStyle(
-                        color: Colors.grey.shade600,
+                        color: inputSecondaryColor,
                         fontSize: 14,
                       ),
                       hintText: 'test@gmail.com',
                       hintStyle: TextStyle(
-                        color: Colors.blue.shade400,
+                        color: inputSecondaryColor,
                         fontSize: 16,
                       ),
                       prefixIcon: Icon(
                         Icons.email_outlined,
-                        color: Colors.blue.shade600,
+                        color: Theme.of(context).colorScheme.primary,
                         size: 22,
                       ),
                       enabledBorder: UnderlineInputBorder(
-                        borderSide: BorderSide(color: Colors.grey.shade300),
+                        borderSide: BorderSide(color: borderColor),
                       ),
                       focusedBorder: UnderlineInputBorder(
                         borderSide: BorderSide(
-                          color: Colors.blue.shade600,
+                          color: Theme.of(context).colorScheme.primary,
                           width: 2,
                         ),
                       ),
@@ -198,22 +226,22 @@ class _LoginPageState extends State<LoginPage> {
                   TextField(
                     controller: passwordController,
                     obscureText: _obscurePassword,
-                    style: TextStyle(fontSize: 16),
+                    style: TextStyle(fontSize: 16, color: inputTextColor),
                     decoration: InputDecoration(
                       labelText: 'Password',
                       labelStyle: TextStyle(
-                        color: Colors.grey.shade600,
+                        color: inputSecondaryColor,
                         fontSize: 14,
                       ),
                       hintText: '••••••',
                       hintStyle: TextStyle(
-                        color: Colors.grey.shade400,
+                        color: inputSecondaryColor,
                         fontSize: 20,
                         letterSpacing: 4,
                       ),
                       prefixIcon: Icon(
                         Icons.lock_outline,
-                        color: Colors.blue.shade600,
+                        color: Theme.of(context).colorScheme.primary,
                         size: 22,
                       ),
                       suffixIcon: IconButton(
@@ -224,16 +252,16 @@ class _LoginPageState extends State<LoginPage> {
                           _obscurePassword
                               ? Icons.visibility_off_outlined
                               : Icons.visibility_outlined,
-                          color: Colors.grey.shade400,
+                          color: inputSecondaryColor,
                           size: 22,
                         ),
                       ),
                       enabledBorder: UnderlineInputBorder(
-                        borderSide: BorderSide(color: Colors.grey.shade300),
+                        borderSide: BorderSide(color: borderColor),
                       ),
                       focusedBorder: UnderlineInputBorder(
                         borderSide: BorderSide(
-                          color: Colors.blue.shade600,
+                          color: Theme.of(context).colorScheme.primary,
                           width: 2,
                         ),
                       ),
@@ -256,7 +284,7 @@ class _LoginPageState extends State<LoginPage> {
                       child: Text(
                         'Forgot password?',
                         style: TextStyle(
-                          color: Colors.blue.shade600,
+                          color: Theme.of(context).colorScheme.primary,
                           fontSize: 14,
                         ),
                       ),
@@ -271,13 +299,15 @@ class _LoginPageState extends State<LoginPage> {
                     child: loading
                         ? Center(
                             child: CircularProgressIndicator(
-                              color: Colors.blue.shade600,
+                              color: Theme.of(context).colorScheme.primary,
                             ),
                           )
                         : ElevatedButton(
                             onPressed: login,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF5B6DEE),
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
                               foregroundColor: Colors.white,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
@@ -305,14 +335,16 @@ class _LoginPageState extends State<LoginPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const RegisterPage(),
+                            builder: (_) => RegisterPage(
+                              onThemeChanged: widget.onThemeChanged,
+                            ),
                           ),
                         );
                       },
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF5B6DEE),
+                        foregroundColor: Theme.of(context).colorScheme.primary,
                         side: BorderSide(
-                          color: const Color(0xFF5B6DEE),
+                          color: Theme.of(context).colorScheme.primary,
                           width: 1.5,
                         ),
                         shape: RoundedRectangleBorder(

@@ -26,6 +26,10 @@ class AuthApi {
         return data;
       }
 
+      if (res.statusCode == 401 || res.statusCode == 403) {
+        return {"valid": false, "unauthorized": true};
+      }
+
       print("❌ Verify failed - status: ${res.statusCode}");
       return null;
     } catch (e) {

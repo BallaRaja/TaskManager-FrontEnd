@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:client/core/constants/api_constants.dart';
+import 'package:client/core/theme/app_theme.dart';
 import '../../../core/utils/session_manager.dart';
 import '../../auth/presentation/login_page.dart';
 
 class ProfileSheet extends StatefulWidget {
-  const ProfileSheet({super.key});
+  final ValueChanged<bool>? onThemeChanged;
+
+  const ProfileSheet({super.key, this.onThemeChanged});
 
   @override
   State<ProfileSheet> createState() => _ProfileSheetState();
@@ -126,21 +129,37 @@ class _ProfileSheetState extends State<ProfileSheet> {
     await SessionManager.clearSession();
     if (context.mounted) {
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginPage()),
+        MaterialPageRoute(
+          builder: (_) => LoginPage(onThemeChanged: widget.onThemeChanged),
+        ),
         (_) => false,
       );
     }
+  }
+
+  Future<void> _updateThemeMode(bool useDarkMode) async {
+    await AppTheme.saveTheme(useDarkMode);
+    widget.onThemeChanged?.call(useDarkMode);
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          useDarkMode
+              ? "Default mode set to Dark"
+              : "Default mode set to Light",
+        ),
+        duration: const Duration(seconds: 1),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Soft greyish backgrounds
-    final backgroundColor = isDark
-        ? const Color(0xFF171022)
-        : const Color(0xFFF5F5F5);
-    final surfaceColor = isDark ? const Color(0xFF1F1828) : Colors.white;
+    final backgroundColor = Theme.of(context).scaffoldBackgroundColor;
 
     return Material(
       color: Colors.transparent,
@@ -154,7 +173,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
               ? const Center(child: CircularProgressIndicator())
               : error != null
               ? _buildErrorState(error!)
-              : _buildProfileContent(isDark, surfaceColor),
+              : _buildProfileContent(isDark),
         ),
       ),
     );
@@ -181,9 +200,19 @@ class _ProfileSheetState extends State<ProfileSheet> {
     );
   }
 
-  Widget _buildProfileContent(bool isDark, Color surfaceColor) {
+  Widget _buildProfileContent(bool isDark) {
     final user = profileData!["profile"];
     final aiFeatures = profileData!["aiFeatures"] as bool;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final featureCardColor = isDark
+        ? const Color(0xFF1E1A2B)
+        : const Color(0xFFECDEFF);
+    final featureIconColor = isDark
+        ? AppTheme.darkSecondary
+        : Colors.purple.shade700;
+    final featureTextColor = isDark
+        ? AppTheme.darkTextPrimary
+        : Colors.purple.shade900;
 
     final avatarUrl = user["avatarUrl"] ?? '';
 
@@ -286,7 +315,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
             width: double.infinity,
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: const Color(0xFFECDEFF), // Matches rgba(236,223,255,255)
+              color: featureCardColor,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
@@ -294,23 +323,59 @@ class _ProfileSheetState extends State<ProfileSheet> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.psychology, color: Colors.purple[700], size: 24),
+                    Icon(Icons.psychology, color: featureIconColor, size: 24),
                     const SizedBox(width: 14),
                     Text(
                       "AI Features",
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Colors.purple[900],
+                        color: featureTextColor,
                       ),
                     ),
                   ],
                 ),
                 Switch(
                   value: aiFeatures,
-                  activeColor: Colors.purple[600],
+                  activeThumbColor: Colors.purple[600],
                   activeTrackColor: const Color(0xFFECB5F6),
                   onChanged: _updateAiFeatures,
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: featureCardColor,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.dark_mode, color: featureIconColor, size: 24),
+                    const SizedBox(width: 14),
+                    Text(
+                      "Dark Mode",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: featureTextColor,
+                      ),
+                    ),
+                  ],
+                ),
+                Switch(
+                  value: isDarkMode,
+                  activeThumbColor: Colors.purple[600],
+                  activeTrackColor: const Color(0xFFECB5F6),
+                  onChanged: _updateThemeMode,
                 ),
               ],
             ),
@@ -323,10 +388,12 @@ class _ProfileSheetState extends State<ProfileSheet> {
             contentPadding: EdgeInsets.zero,
             leading: CircleAvatar(
               radius: 20,
-              backgroundColor: Colors.grey[200],
+              backgroundColor: isDark
+                  ? const Color(0xFF2A2438)
+                  : Colors.grey[200],
               child: Icon(
                 Icons.help_outline,
-                color: Colors.grey[700],
+                color: isDark ? AppTheme.darkSecondary : Colors.grey[700],
                 size: 22,
               ),
             ),
@@ -337,7 +404,10 @@ class _ProfileSheetState extends State<ProfileSheet> {
                 color: isDark ? Colors.grey[300] : Colors.grey[700],
               ),
             ),
-            trailing: Icon(Icons.chevron_right, color: Colors.grey[500]),
+            trailing: Icon(
+              Icons.chevron_right,
+              color: isDark ? Colors.grey[400] : Colors.grey[500],
+            ),
             onTap: () {
               print("🧪 [Profile] Help & feedback tapped");
             },

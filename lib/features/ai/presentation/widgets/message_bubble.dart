@@ -20,6 +20,15 @@ class MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUser = message.role == MessageRole.user;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final userBubbleColor = isDark
+        ? const Color(0xFF9C6BFF)
+        : const Color(0xFF7C4DFF);
+    final assistantBubbleColor = isDark
+        ? const Color(0xFF1E1A2B)
+        : const Color(0xFFEDE7FF);
+    final assistantTextColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
 
     return Column(
       crossAxisAlignment: isUser
@@ -35,13 +44,13 @@ class MessageBubble extends StatelessWidget {
               maxWidth: MediaQuery.of(context).size.width * 0.75,
             ),
             decoration: BoxDecoration(
-              color: isUser ? Colors.purple : Colors.grey[200],
+              color: isUser ? userBubbleColor : assistantBubbleColor,
               borderRadius: BorderRadius.circular(18),
             ),
             child: Text(
               message.content,
               style: TextStyle(
-                color: isUser ? Colors.white : Colors.black87,
+                color: isUser ? Colors.white : assistantTextColor,
                 fontSize: 15,
               ),
             ),
