@@ -155,6 +155,33 @@ class TasksController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<Map<String, dynamic>?> updateTask(
+    String taskId,
+    Map<String, dynamic> data,
+  ) async {
+    _token ??= await SessionManager.getToken();
+    if (_token == null) return null;
+
+    try {
+      final response = await http.put(
+        Uri.parse('${ApiConstants.backendUrl}/api/task/$taskId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+        body: jsonEncode(data),
+      );
+
+      if (response.statusCode == 200) {
+        final updated =
+            jsonDecode(response.body)['data'] as Map<String, dynamic>?;
+        if (updated != null) upsertTaskLocal(updated);
+        return updated;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   void upsertTaskLocal(Map<String, dynamic> updatedTask) {
     final String? id = updatedTask['_id']?.toString();
     if (id == null) return;

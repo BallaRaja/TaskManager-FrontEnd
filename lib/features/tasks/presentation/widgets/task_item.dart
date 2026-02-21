@@ -6,6 +6,7 @@ import 'dart:convert';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/utils/session_manager.dart';
 import '../tasks_controller.dart';
+import 'edit_task_sheet.dart';
 
 class TaskItem extends StatelessWidget {
   final Map<String, dynamic> task;
@@ -333,81 +334,86 @@ class TaskItem extends StatelessWidget {
           return true;
         }
       },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isCompleted
-                ? Colors.transparent
-                : Colors.grey.withOpacity(0.1),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+      child: GestureDetector(
+        onTap: isArchived ? null : () => showEditTaskSheet(context, task),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isCompleted
+                  ? Colors.transparent
+                  : Colors.grey.withOpacity(0.1),
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            GestureDetector(
-              onTap: isArchived ? null : () => _toggleComplete(context),
-              child: Checkbox(
-                value: isCompleted,
-                onChanged: isArchived ? null : (_) => _toggleComplete(context),
-                shape: const CircleBorder(),
-                activeColor: Colors.purple,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    task["title"] ?? "Untitled",
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      decoration: isCompleted
-                          ? TextDecoration.lineThrough
-                          : null,
-                      color: isCompleted ? Colors.grey : null,
-                    ),
-                  ),
-                  if (dueText != null || task["notes"] != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        dueText ?? task["notes"] ?? "",
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isToday ? Colors.red : Colors.grey[600],
-                        ),
+            ],
+          ),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: isArchived ? null : () => _toggleComplete(context),
+                child: Checkbox(
+                  value: isCompleted,
+                  onChanged: isArchived
+                      ? null
+                      : (_) => _toggleComplete(context),
+                  shape: const CircleBorder(),
+                  activeColor: Colors.purple,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      task["title"] ?? "Untitled",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        decoration: isCompleted
+                            ? TextDecoration.lineThrough
+                            : null,
+                        color: isCompleted ? Colors.grey : null,
                       ),
                     ),
-                ],
+                    if (dueText != null || task["notes"] != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          dueText ?? task["notes"] ?? "",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isToday ? Colors.red : Colors.grey[600],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            // STAR / IMPORTANT BUTTON
-            IconButton(
-              icon: Icon(
-                isImportant ? Icons.star : Icons.star_border,
-                color: isImportant ? Colors.amber : Colors.grey[400],
-                size: 28,
+              // STAR / IMPORTANT BUTTON
+              IconButton(
+                icon: Icon(
+                  isImportant ? Icons.star : Icons.star_border,
+                  color: isImportant ? Colors.amber : Colors.grey[400],
+                  size: 28,
+                ),
+                onPressed: isArchived ? null : () => _toggleImportant(context),
+                tooltip: isImportant
+                    ? "Remove from Starred"
+                    : "Mark as Important",
               ),
-              onPressed: isArchived ? null : () => _toggleImportant(context),
-              tooltip: isImportant
-                  ? "Remove from Starred"
-                  : "Mark as Important",
-            ),
-          ],
-        ),
-      ),
+            ],
+          ),
+        ), // end Container
+      ), // end GestureDetector
     );
   }
 }
