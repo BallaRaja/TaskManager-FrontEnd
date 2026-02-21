@@ -8,6 +8,16 @@ import '../../../tasks/presentation/widgets/task_item.dart';
 class WeeklyView extends StatelessWidget {
   const WeeklyView({super.key});
 
+  static const List<String> _weekLabels = [
+    'Sun',
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+  ];
+
   bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
@@ -15,6 +25,7 @@ class WeeklyView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Provider.of<CalendarController>(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final DateTime firstDayOfWeek = controller.selectedDate.subtract(
       Duration(days: controller.selectedDate.weekday % 7),
     );
@@ -57,56 +68,86 @@ class WeeklyView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
-            children: weekDays.map((date) {
-              final hasTasks = controller.getInstancesForDate(date).isNotEmpty;
-              final isSelected = _isSameDay(date, controller.selectedDate);
-              return GestureDetector(
-                onTap: () => controller.setSelectedDate(date),
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 8),
-                  width: 60,
-                  child: Column(
-                    children: [
-                      Text(
-                        DateFormat('EEE').format(date),
+            children: _weekLabels
+                .map(
+                  (label) => Expanded(
+                    child: Center(
+                      child: Text(
+                        label,
                         style: TextStyle(
-                          color: isSelected ? Colors.purple : Colors.grey[600],
-                          fontWeight: isSelected
-                              ? FontWeight.bold
-                              : FontWeight.normal,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      CircleAvatar(
-                        radius: 18,
-                        backgroundColor: isSelected
-                            ? Colors.purple
-                            : Colors.transparent,
-                        child: Text(
-                          date.day.toString(),
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.black,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      if (hasTasks)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 4),
-                          child: Icon(
-                            Icons.circle,
-                            size: 6,
-                            color: Colors.purple,
-                          ),
-                        ),
-                    ],
+                    ),
                   ),
-                ),
+                )
+                .toList(),
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragEnd: (details) {
+            final velocity = details.primaryVelocity ?? 0;
+            if (velocity < -100) {
+              controller.setSelectedDate(
+                controller.selectedDate.add(const Duration(days: 7)),
               );
-            }).toList(),
+            } else if (velocity > 100) {
+              controller.setSelectedDate(
+                controller.selectedDate.subtract(const Duration(days: 7)),
+              );
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: weekDays.map((date) {
+                final hasTasks = controller
+                    .getInstancesForDate(date)
+                    .isNotEmpty;
+                final isSelected = _isSameDay(date, controller.selectedDate);
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => controller.setSelectedDate(date),
+                    child: Column(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: isSelected
+                              ? Colors.purple
+                              : Colors.transparent,
+                          child: Text(
+                            date.day.toString(),
+                            style: TextStyle(
+                              color: isSelected
+                                  ? Colors.white
+                                  : (isDark ? Colors.white : Colors.black),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        if (hasTasks)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 4),
+                            child: Icon(
+                              Icons.circle,
+                              size: 6,
+                              color: Colors.purple,
+                            ),
+                          )
+                        else
+                          const SizedBox(height: 10),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
           ),
         ),
         const Divider(height: 32),

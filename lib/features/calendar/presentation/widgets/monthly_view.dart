@@ -74,7 +74,11 @@ class MonthlyView extends StatelessWidget {
                       fontWeight: isSelected
                           ? FontWeight.bold
                           : FontWeight.normal,
-                      color: isSelected ? Colors.white : Colors.black87,
+                      color: isSelected
+                          ? Colors.white
+                          : (Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Colors.black87),
                     ),
                   ),
                 ),
@@ -101,82 +105,113 @@ class MonthlyView extends StatelessWidget {
 
     return Column(
       children: [
-        // ───── Month Header ─────
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left),
-                onPressed: () {
-                  controller.setSelectedDate(
-                    DateTime(
-                      controller.selectedDate.year,
-                      controller.selectedDate.month - 1,
-                      1,
-                    ),
-                  );
-                },
-              ),
-              Expanded(
-                child: Center(
-                  child: Text(
-                    DateFormat('MMMM yyyy').format(focusedMonth),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragEnd: (details) {
+            final velocity = details.primaryVelocity ?? 0;
+            if (velocity < -100) {
+              controller.setSelectedDate(
+                DateTime(
+                  controller.selectedDate.year,
+                  controller.selectedDate.month + 1,
+                  1,
                 ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right),
-                onPressed: () {
-                  controller.setSelectedDate(
-                    DateTime(
-                      controller.selectedDate.year,
-                      controller.selectedDate.month + 1,
-                      1,
+              );
+            } else if (velocity > 100) {
+              controller.setSelectedDate(
+                DateTime(
+                  controller.selectedDate.year,
+                  controller.selectedDate.month - 1,
+                  1,
+                ),
+              );
+            }
+          },
+          child: Column(
+            children: [
+              // ───── Month Header ─────
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: () {
+                        controller.setSelectedDate(
+                          DateTime(
+                            controller.selectedDate.year,
+                            controller.selectedDate.month - 1,
+                            1,
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-
-        // ───── Weekday Row ─────
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(
-            children: const ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-                .map(
-                  (day) => Expanded(
-                    child: Center(
-                      child: Text(
-                        day,
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          DateFormat('MMMM yyyy').format(focusedMonth),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                )
-                .toList(),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: () {
+                        controller.setSelectedDate(
+                          DateTime(
+                            controller.selectedDate.year,
+                            controller.selectedDate.month + 1,
+                            1,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+              // ───── Weekday Row ─────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children:
+                      const ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+                          .map(
+                            (day) => Expanded(
+                              child: Center(
+                                child: Text(
+                                  day,
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                ),
+              ),
+
+              const SizedBox(height: 6),
+
+              // ───── Calendar Grid (NO FIXED HEIGHT) ─────
+              GridView.count(
+                crossAxisCount: 7,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                childAspectRatio: isSmallScreen ? 1.25 : 1.15,
+                children: dayCells,
+              ),
+            ],
           ),
-        ),
-
-        const SizedBox(height: 6),
-
-        // ───── Calendar Grid (NO FIXED HEIGHT) ─────
-        GridView.count(
-          crossAxisCount: 7,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: isSmallScreen ? 1.25 : 1.15,
-          children: dayCells,
         ),
 
         const Divider(height: 1),
