@@ -687,9 +687,12 @@ class _EditTaskSheetState extends State<EditTaskSheet> {
                   onPressed: _saveTask,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.purple,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 28,
+                    ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                      borderRadius: BorderRadius.circular(14),
                     ),
                   ),
                   child: const Text(

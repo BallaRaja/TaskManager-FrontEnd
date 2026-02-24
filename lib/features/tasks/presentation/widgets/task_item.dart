@@ -359,13 +359,22 @@ class TaskItem extends StatelessWidget {
             children: [
               GestureDetector(
                 onTap: isArchived ? null : () => _toggleComplete(context),
-                child: Checkbox(
-                  value: isCompleted,
-                  onChanged: isArchived
-                      ? null
-                      : (_) => _toggleComplete(context),
-                  shape: const CircleBorder(),
-                  activeColor: Colors.purple,
+                child: Transform.scale(
+                  scale: 1.25,
+                  child: Checkbox(
+                    value: isCompleted,
+                    onChanged: isArchived
+                        ? null
+                        : (_) => _toggleComplete(context),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    activeColor: Colors.purple,
+                    side: BorderSide(
+                      color: isCompleted ? Colors.purple : Colors.grey.shade400,
+                      width: 1.8,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),

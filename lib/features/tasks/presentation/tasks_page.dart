@@ -112,6 +112,229 @@ class _TasksPageState extends State<TasksPage> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────
+  //  List options (long-press on a tab)
+  // ─────────────────────────────────────────────────────────
+
+  void _showListOptions(
+    BuildContext context,
+    TasksController controller,
+    int index,
+    Map<String, dynamic> listData,
+  ) {
+    if (listData['isDefault'] == true) return; // My Tasks ─ no options
+
+    final String listId = listData['_id'].toString();
+    final String listTitle = listData['title']?.toString() ?? 'Untitled';
+    final int taskCount = controller.tasks
+        .where((t) => t['taskListId']?.toString() == listId)
+        .length;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[400],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // List info chip
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.purple.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.list_alt_rounded,
+                      color: Colors.purple,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          listTitle,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$taskCount task${taskCount == 1 ? '' : 's'}',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Divider(),
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFFEDE7F6),
+                child: Icon(Icons.edit_outlined, color: Colors.purple),
+              ),
+              title: const Text(
+                'Rename List',
+                style: TextStyle(fontWeight: FontWeight.w500),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _showRenameDialog(context, controller, listId, listTitle);
+              },
+            ),
+            const SizedBox(height: 4),
+            ListTile(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              leading: CircleAvatar(
+                backgroundColor: Colors.red.shade50,
+                child: const Icon(Icons.delete_outline, color: Colors.red),
+              ),
+              title: const Text(
+                'Delete List',
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: Colors.red,
+                ),
+              ),
+              subtitle: Text(
+                '$taskCount task${taskCount == 1 ? '' : 's'} will also be deleted',
+                style: const TextStyle(fontSize: 12),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _showDeleteConfirmDialog(
+                  context,
+                  controller,
+                  listId,
+                  listTitle,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showRenameDialog(
+    BuildContext context,
+    TasksController controller,
+    String listId,
+    String currentTitle,
+  ) {
+    final renamer = TextEditingController(text: currentTitle);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Rename List'),
+        content: TextField(
+          controller: renamer,
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: InputDecoration(
+            hintText: 'List name',
+            filled: true,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.purple),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await controller.renameTaskList(listId, renamer.text);
+            },
+            child: const Text('Rename'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirmDialog(
+    BuildContext context,
+    TasksController controller,
+    String listId,
+    String listTitle,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Delete List?'),
+          ],
+        ),
+        content: Text(
+          '"$listTitle" and all its tasks will be permanently deleted.\nThis cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await controller.deleteTaskList(listId);
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showViewMenu(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -176,12 +399,14 @@ class _TasksPageState extends State<TasksPage> {
 
           // === FILTERING LOGIC ===
           List<Map<String, dynamic>> displayedTasks = controller.tasks;
+          Map<String, dynamic>? activeList; // non-null only for custom lists
 
           if (_viewType == TaskViewType.normal) {
             if (controller.taskLists.isNotEmpty) {
               final currentList =
                   controller.taskLists[controller.selectedListIndex];
               if (currentList["isDefault"] != true) {
+                activeList = currentList;
                 final String currentListId = currentList["_id"];
                 displayedTasks = controller.tasks
                     .where(
@@ -309,6 +534,13 @@ class _TasksPageState extends State<TasksPage> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                 children: [
+                  if (activeList != null)
+                    _buildListHeader(
+                      context,
+                      activeList,
+                      pending.length,
+                      completed.length,
+                    ),
                   ...pending.map((t) => TaskItem(task: t, isCompleted: false)),
                   const SizedBox(height: 32),
                   CompletedSection(completedTasks: completed),
@@ -330,6 +562,103 @@ class _TasksPageState extends State<TasksPage> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────
+  //  List name header (shown at the top of the task list for custom lists)
+  // ─────────────────────────────────────────────────────────
+
+  Widget _buildListHeader(
+    BuildContext context,
+    Map<String, dynamic> list,
+    int pendingCount,
+    int completedCount,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.purple.shade500, Colors.purple.shade800],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.purple.withOpacity(0.35),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  list['title']?.toString() ?? 'Untitled',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    _listStatChip(
+                      '$pendingCount pending',
+                      Colors.white.withOpacity(0.25),
+                    ),
+                    _listStatChip(
+                      '$completedCount done',
+                      Colors.white.withOpacity(0.15),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.checklist_rounded,
+              color: Colors.white,
+              size: 30,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _listStatChip(String label, Color bg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
   Widget _buildTabBar(BuildContext context, TasksController controller) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -339,6 +668,8 @@ class _TasksPageState extends State<TasksPage> {
           ...controller.taskLists.asMap().entries.map((e) {
             return GestureDetector(
               onTap: () => controller.selectList(e.key),
+              onLongPress: () =>
+                  _showListOptions(context, controller, e.key, e.value),
               child: TaskListTab(
                 title: e.value["title"] ?? "Untitled",
                 isActive: e.key == controller.selectedListIndex,
@@ -348,7 +679,7 @@ class _TasksPageState extends State<TasksPage> {
           const SizedBox(width: 20),
           GestureDetector(
             onTap: () => _showCreateListDialog(context, controller),
-            child: const TaskListTab(title: "Add new list", isAddButton: true),
+            child: const TaskListTab(title: "+ New List", isAddButton: true),
           ),
         ],
       ),

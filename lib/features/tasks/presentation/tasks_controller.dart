@@ -135,6 +135,58 @@ class TasksController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<void> deleteTaskList(String listId) async {
+    _token ??= await SessionManager.getToken();
+    if (_token == null) return;
+
+    try {
+      final response = await http.delete(
+        Uri.parse('${ApiConstants.backendUrl}/api/taskList/$listId'),
+        headers: {'Authorization': 'Bearer $_token'},
+      );
+
+      if (response.statusCode == 200) {
+        _taskLists.removeWhere((l) => l['_id']?.toString() == listId);
+        _tasks.removeWhere((t) => t['taskListId']?.toString() == listId);
+        _selectedListIndex = 0;
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> renameTaskList(String listId, String newTitle) async {
+    _token ??= await SessionManager.getToken();
+    if (_token == null) return;
+
+    final trimmed = newTitle.trim();
+    if (trimmed.isEmpty) return;
+
+    try {
+      final response = await http.put(
+        Uri.parse('${ApiConstants.backendUrl}/api/taskList/$listId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+        body: jsonEncode({'title': trimmed}),
+      );
+
+      if (response.statusCode == 200) {
+        final updated =
+            jsonDecode(response.body)['data'] as Map<String, dynamic>?;
+        if (updated != null) {
+          final idx = _taskLists.indexWhere(
+            (l) => l['_id']?.toString() == listId,
+          );
+          if (idx != -1) {
+            _taskLists[idx] = updated;
+            notifyListeners();
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
   Future<void> createTask(Map<String, dynamic> taskData) async {
     _token ??= await SessionManager.getToken();
     if (_token == null) return;
