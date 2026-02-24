@@ -352,8 +352,34 @@ class TaskItem extends StatelessWidget {
           }
           return false;
         } else {
-          await _archiveTask(context);
-          return true;
+          // Right swipe → Archive confirmation
+          final confirm = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text("Archive Task?"),
+              content: const Text(
+                "This task will be moved to Archived. You can restore it later.",
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text("Cancel"),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text(
+                    "Archive",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+              ],
+            ),
+          );
+          if (confirm == true) {
+            await _archiveTask(context);
+            return true;
+          }
+          return false;
         }
       },
       child: GestureDetector(

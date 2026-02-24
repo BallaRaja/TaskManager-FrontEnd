@@ -335,7 +335,7 @@ class _TasksPageState extends State<TasksPage> {
     );
   }
 
-  void _openSidePanel(BuildContext context) {
+  void _openSidePanel(BuildContext context, TasksController controller) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final panelWidth = MediaQuery.of(context).size.width * 0.78;
 
@@ -386,6 +386,7 @@ class _TasksPageState extends State<TasksPage> {
                   ),
                   const Divider(height: 1),
                   const SizedBox(height: 12),
+                  // ── VIEWS section ──
                   const Padding(
                     padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
                     child: Text(
@@ -428,6 +429,9 @@ class _TasksPageState extends State<TasksPage> {
                     },
                     _viewType == TaskViewType.archived,
                   ),
+                  // ── MY LISTS section ──
+                  if (controller.taskLists.isNotEmpty)
+                    ..._buildSidePanelLists(ctx, controller),
                 ],
               ),
             ),
@@ -442,6 +446,106 @@ class _TasksPageState extends State<TasksPage> {
         child: child,
       ),
     );
+  }
+
+  /// Builds the MY LISTS section widgets for the side panel.
+  List<Widget> _buildSidePanelLists(
+    BuildContext ctx,
+    TasksController controller,
+  ) {
+    return [
+      const SizedBox(height: 16),
+      const Divider(height: 1),
+      const Padding(
+        padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+        child: Text(
+          'MY LISTS',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: Colors.grey,
+            letterSpacing: 1.4,
+          ),
+        ),
+      ),
+      Expanded(
+        child: ListView.builder(
+          padding: const EdgeInsets.only(bottom: 24),
+          itemCount: controller.taskLists.length,
+          itemBuilder: (_, i) {
+            final list = controller.taskLists[i];
+            final String listTitle = list['title']?.toString() ?? 'Untitled';
+            final String listId = list['_id']?.toString() ?? '';
+            final int taskCount = controller.tasks
+                .where(
+                  (t) =>
+                      t['taskListId']?.toString() == listId &&
+                      t['status'] != 'completed',
+                )
+                .length;
+            final bool isDefault = list['isDefault'] == true;
+            final bool isSelected =
+                _viewType == TaskViewType.normal &&
+                i == controller.selectedListIndex;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              child: ListTile(
+                leading: Icon(
+                  isDefault ? Icons.inbox_rounded : Icons.list_alt_rounded,
+                  color: isSelected ? Colors.purple : Colors.grey[600],
+                  size: 22,
+                ),
+                title: Text(
+                  listTitle,
+                  style: TextStyle(
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: isSelected ? Colors.purple : null,
+                  ),
+                ),
+                trailing: taskCount > 0
+                    ? Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Colors.purple
+                              : Colors.grey.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '$taskCount',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: isSelected ? Colors.white : Colors.grey[700],
+                          ),
+                        ),
+                      )
+                    : null,
+                tileColor: isSelected ? Colors.purple.withOpacity(0.08) : null,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 2,
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  setState(() {
+                    _viewType = TaskViewType.normal;
+                  });
+                  controller.selectList(i);
+                },
+              ),
+            );
+          },
+        ),
+      ),
+    ];
   }
 
   Widget _panelTile(
@@ -531,7 +635,7 @@ class _TasksPageState extends State<TasksPage> {
                 leading: _viewType == TaskViewType.normal
                     ? IconButton(
                         icon: const Icon(Icons.menu),
-                        onPressed: () => _openSidePanel(context),
+                        onPressed: () => _openSidePanel(context, controller),
                       )
                     : IconButton(
                         icon: const Icon(Icons.arrow_back),
