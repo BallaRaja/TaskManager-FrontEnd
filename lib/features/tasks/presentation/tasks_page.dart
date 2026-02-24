@@ -456,16 +456,32 @@ class _TasksPageState extends State<TasksPage> {
     return [
       const SizedBox(height: 16),
       const Divider(height: 1),
-      const Padding(
-        padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
-        child: Text(
-          'MY LISTS',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: Colors.grey,
-            letterSpacing: 1.4,
-          ),
+      const SizedBox(height: 4),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 4, 0),
+        child: Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'MY LISTS',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey,
+                  letterSpacing: 1.4,
+                ),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(
+                Icons.sort_rounded,
+                size: 20,
+                color: Colors.grey,
+              ),
+              tooltip: 'Sort lists',
+              onPressed: () => _showListSortSheet(ctx, controller),
+            ),
+          ],
         ),
       ),
       Expanded(
@@ -548,6 +564,277 @@ class _TasksPageState extends State<TasksPage> {
     ];
   }
 
+  // ── Sort Lists bottom sheet ────────────────────────────────────────
+
+  void _showListSortSheet(BuildContext panelCtx, TasksController controller) {
+    showModalBottomSheet(
+      context: panelCtx,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (sheetCtx, setSheetState) {
+            return Container(
+              decoration: BoxDecoration(
+                color: Theme.of(panelCtx).scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[400],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Sort My Lists',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  _sortOptionTile(
+                    sheetCtx,
+                    icon: Icons.drag_indicator_rounded,
+                    label: 'Custom Order',
+                    sub: 'Drag lists into any order',
+                    mode: TaskListSortMode.custom,
+                    current: controller.listSortMode,
+                    onSelect: () async {
+                      await controller.setListSortMode(TaskListSortMode.custom);
+                      setSheetState(() {});
+                    },
+                  ),
+                  _sortOptionTile(
+                    sheetCtx,
+                    icon: Icons.sort_by_alpha_rounded,
+                    label: 'A → Z',
+                    sub: 'Alphabetical ascending',
+                    mode: TaskListSortMode.az,
+                    current: controller.listSortMode,
+                    onSelect: () async {
+                      await controller.setListSortMode(TaskListSortMode.az);
+                      setSheetState(() {});
+                    },
+                  ),
+                  _sortOptionTile(
+                    sheetCtx,
+                    icon: Icons.sort_by_alpha_rounded,
+                    label: 'Z → A',
+                    sub: 'Alphabetical descending',
+                    mode: TaskListSortMode.za,
+                    current: controller.listSortMode,
+                    onSelect: () async {
+                      await controller.setListSortMode(TaskListSortMode.za);
+                      setSheetState(() {});
+                    },
+                  ),
+                  if (controller.listSortMode == TaskListSortMode.custom) ...[
+                    const SizedBox(height: 12),
+                    const Divider(),
+                    const SizedBox(height: 4),
+                    ListTile(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      leading: const CircleAvatar(
+                        backgroundColor: Color(0xFFEDE7F6),
+                        child: Icon(
+                          Icons.reorder_rounded,
+                          color: Colors.purple,
+                        ),
+                      ),
+                      title: const Text(
+                        'Reorder Lists',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: const Text('Drag to rearrange your lists'),
+                      trailing: const Icon(
+                        Icons.chevron_right,
+                        color: Colors.purple,
+                      ),
+                      onTap: () {
+                        Navigator.pop(sheetCtx);
+                        _showReorderListsSheet(panelCtx, controller);
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _sortOptionTile(
+    BuildContext ctx, {
+    required IconData icon,
+    required String label,
+    required String sub,
+    required TaskListSortMode mode,
+    required TaskListSortMode current,
+    required VoidCallback onSelect,
+  }) {
+    final bool isActive = current == mode;
+    return ListTile(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      leading: Icon(icon, color: isActive ? Colors.purple : Colors.grey[600]),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+          color: isActive ? Colors.purple : null,
+        ),
+      ),
+      subtitle: Text(sub, style: const TextStyle(fontSize: 12)),
+      tileColor: isActive ? Colors.purple.withOpacity(0.07) : null,
+      trailing: isActive
+          ? const Icon(Icons.check_circle_rounded, color: Colors.purple)
+          : null,
+      onTap: onSelect,
+    );
+  }
+
+  // ── Drag-reorder lists sheet ────────────────────────────────────
+
+  void _showReorderListsSheet(
+    BuildContext panelCtx,
+    TasksController controller,
+  ) {
+    showModalBottomSheet(
+      context: panelCtx,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.65,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        builder: (sheetCtx, scrollCtrl) {
+          // Non-default lists only
+          final nonDefault = controller.taskLists
+              .where((l) => l['isDefault'] != true)
+              .toList();
+
+          return StatefulBuilder(
+            builder: (sheetCtx, setSheetState) {
+              return Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(panelCtx).scaffoldBackgroundColor,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // Handle + header
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+                      child: Column(
+                        children: [
+                          Center(
+                            child: Container(
+                              width: 40,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[400],
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.reorder_rounded,
+                                color: Colors.purple,
+                              ),
+                              const SizedBox(width: 10),
+                              const Expanded(
+                                child: Text(
+                                  'Reorder Lists',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(sheetCtx),
+                                child: const Text('Done'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Long-press and drag to reorder',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    // Reorderable list
+                    Expanded(
+                      child: ReorderableListView.builder(
+                        scrollController: scrollCtrl,
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+                        itemCount: nonDefault.length,
+                        itemBuilder: (_, i) {
+                          final list = nonDefault[i];
+                          final title = list['title']?.toString() ?? 'Untitled';
+                          return ListTile(
+                            key: ValueKey(list['_id']),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            leading: const Icon(
+                              Icons.list_alt_rounded,
+                              color: Colors.purple,
+                            ),
+                            title: Text(
+                              title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            trailing: const Icon(
+                              Icons.drag_handle_rounded,
+                              color: Colors.grey,
+                            ),
+                          );
+                        },
+                        onReorder: (oldIdx, newIdx) async {
+                          if (newIdx > oldIdx) newIdx--;
+                          await controller.reorderLists(oldIdx, newIdx);
+                          setSheetState(() {});
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
   Widget _panelTile(
     BuildContext ctx,
     IconData icon,
@@ -593,14 +880,15 @@ class _TasksPageState extends State<TasksPage> {
           // === FILTERING LOGIC ===
           List<Map<String, dynamic>> displayedTasks = controller.tasks;
           Map<String, dynamic>? activeList; // non-null only for custom lists
+          String? currentListId;
 
           if (_viewType == TaskViewType.normal) {
             if (controller.taskLists.isNotEmpty) {
               final currentList =
                   controller.taskLists[controller.selectedListIndex];
+              currentListId = currentList['_id']?.toString();
               if (currentList["isDefault"] != true) {
                 activeList = currentList;
-                final String currentListId = currentList["_id"];
                 displayedTasks = controller.tasks
                     .where(
                       (task) => task["taskListId"]?.toString() == currentListId,
@@ -621,6 +909,13 @@ class _TasksPageState extends State<TasksPage> {
           final pending = displayedTasks
               .where((t) => t["status"] == "pending")
               .toList();
+
+          // Apply custom task order when in normal view with a known list
+          final orderedPending =
+              (_viewType == TaskViewType.normal && currentListId != null)
+              ? controller.getOrderedPendingTasks(currentListId, pending)
+              : pending;
+
           final completed = displayedTasks
               .where((t) => t["status"] == "completed")
               .toList();
@@ -731,10 +1026,41 @@ class _TasksPageState extends State<TasksPage> {
                     _buildListHeader(
                       context,
                       activeList,
-                      pending.length,
+                      orderedPending.length,
                       completed.length,
                     ),
-                  ...pending.map((t) => TaskItem(task: t, isCompleted: false)),
+                  // Reorderable pending tasks (long-press to drag)
+                  ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    buildDefaultDragHandles: false,
+                    proxyDecorator: (child, index, animation) => Material(
+                      elevation: 6,
+                      borderRadius: BorderRadius.circular(16),
+                      shadowColor: Colors.purple.withOpacity(0.25),
+                      child: child,
+                    ),
+                    itemCount: orderedPending.length,
+                    itemBuilder: (_, i) {
+                      final task = orderedPending[i];
+                      return ReorderableDelayedDragStartListener(
+                        key: ValueKey(task['_id']),
+                        index: i,
+                        child: TaskItem(task: task, isCompleted: false),
+                      );
+                    },
+                    onReorder: (oldIdx, newIdx) {
+                      if (newIdx > oldIdx) newIdx--;
+                      if (currentListId != null) {
+                        controller.reorderTasks(
+                          currentListId,
+                          oldIdx,
+                          newIdx,
+                          orderedPending,
+                        );
+                      }
+                    },
+                  ),
                   const SizedBox(height: 32),
                   CompletedSection(completedTasks: completed),
                   const SizedBox(height: 40),
