@@ -205,13 +205,36 @@ class MonthlyView extends StatelessWidget {
 
               const SizedBox(height: 6),
 
-              // ───── Calendar Grid (NO FIXED HEIGHT) ─────
-              GridView.count(
-                crossAxisCount: 7,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                childAspectRatio: isSmallScreen ? 1.25 : 1.15,
-                children: dayCells,
+              // ───── Calendar Grid with Slide Animation ─────
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 320),
+                transitionBuilder: (child, animation) {
+                  final direction = controller.navigationDirection;
+                  final slideIn =
+                      Tween<Offset>(
+                        begin: Offset(direction.toDouble(), 0),
+                        end: Offset.zero,
+                      ).animate(
+                        CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                        ),
+                      );
+                  return ClipRect(
+                    child: SlideTransition(
+                      position: slideIn,
+                      child: FadeTransition(opacity: animation, child: child),
+                    ),
+                  );
+                },
+                child: GridView.count(
+                  key: ValueKey('${focusedMonth.year}-${focusedMonth.month}'),
+                  crossAxisCount: 7,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  childAspectRatio: isSmallScreen ? 1.25 : 1.15,
+                  children: dayCells,
+                ),
               ),
             ],
           ),
@@ -220,7 +243,11 @@ class MonthlyView extends StatelessWidget {
         const SizedBox(height: 12),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Divider(height: 1, thickness: 1, color: Colors.grey.withOpacity(0.35)),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Colors.grey.withOpacity(0.35),
+          ),
         ),
         const SizedBox(height: 4),
 

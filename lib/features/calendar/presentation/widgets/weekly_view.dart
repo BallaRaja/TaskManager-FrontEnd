@@ -103,59 +103,82 @@ class WeeklyView extends StatelessWidget {
               );
             }
           },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: weekDays.map((date) {
-                final hasTasks = controller
-                    .getInstancesForDate(date)
-                    .isNotEmpty;
-                final isSelected = _isSameDay(date, controller.selectedDate);
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () => controller.setSelectedDate(date),
-                    child: Column(
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Colors.purple
-                                : (isDark
-                                      ? Colors.white.withOpacity(0.08)
-                                      : Colors.grey.withOpacity(0.12)),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            date.day.toString(),
-                            style: TextStyle(
-                              color: isSelected
-                                  ? Colors.white
-                                  : (isDark ? Colors.white : Colors.black87),
-                              fontWeight: FontWeight.normal,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                        if (hasTasks)
-                          const Padding(
-                            padding: EdgeInsets.only(top: 4),
-                            child: Icon(
-                              Icons.circle,
-                              size: 6,
-                              color: Colors.purple,
-                            ),
-                          )
-                        else
-                          const SizedBox(height: 10),
-                      ],
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 320),
+            transitionBuilder: (child, animation) {
+              final direction = controller.navigationDirection;
+              final slideIn =
+                  Tween<Offset>(
+                    begin: Offset(direction.toDouble(), 0),
+                    end: Offset.zero,
+                  ).animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+              return ClipRect(
+                child: SlideTransition(
+                  position: slideIn,
+                  child: FadeTransition(opacity: animation, child: child),
+                ),
+              );
+            },
+            child: Padding(
+              key: ValueKey(firstDayOfWeek),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: weekDays.map((date) {
+                  final hasTasks = controller
+                      .getInstancesForDate(date)
+                      .isNotEmpty;
+                  final isSelected = _isSameDay(date, controller.selectedDate);
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () => controller.setSelectedDate(date),
+                      child: Column(
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? Colors.purple
+                                  : (isDark
+                                        ? Colors.white.withOpacity(0.08)
+                                        : Colors.grey.withOpacity(0.12)),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              date.day.toString(),
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Colors.white
+                                    : (isDark ? Colors.white : Colors.black87),
+                                fontWeight: FontWeight.normal,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          if (hasTasks)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 4),
+                              child: Icon(
+                                Icons.circle,
+                                size: 6,
+                                color: Colors.purple,
+                              ),
+                            )
+                          else
+                            const SizedBox(height: 10),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
           ),
         ),

@@ -21,6 +21,9 @@ class CalendarController extends ChangeNotifier {
   String? get avatarUrl => _avatarUrl;
   bool get isLoadingAvatar => _isLoadingAvatar;
 
+  /// 1 = navigating forward (next week/month), -1 = backward (previous)
+  int navigationDirection = 1;
+
   Future<void> init() async {
     _token = await SessionManager.getToken();
     _userId = await SessionManager.getUserId();
@@ -90,7 +93,9 @@ class CalendarController extends ChangeNotifier {
   }
 
   void setSelectedDate(DateTime date) {
-    selectedDate = DateTime(date.year, date.month, date.day);
+    final newDate = DateTime(date.year, date.month, date.day);
+    navigationDirection = newDate.isAfter(selectedDate) ? 1 : -1;
+    selectedDate = newDate;
     notifyListeners();
   }
 
