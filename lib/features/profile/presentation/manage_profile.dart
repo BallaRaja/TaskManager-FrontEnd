@@ -8,6 +8,7 @@ import 'package:http_parser/http_parser.dart';
 
 import 'package:client/core/constants/api_constants.dart';
 import '../../../core/utils/session_manager.dart';
+import 'avatar_crop_page.dart';
 
 class ManageProfilePage extends StatefulWidget {
   final Map<String, dynamic> profileData;
@@ -73,27 +74,41 @@ class _ManageProfilePageState extends State<ManageProfilePage> {
 
   Future<void> _pickImage(ImageSource source) async {
     try {
+      // Pick at higher resolution so crop has more pixels to work with
       final XFile? pickedFile = await _picker.pickImage(
         source: source,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 85,
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 90,
       );
 
-      if (pickedFile != null) {
-        setState(() {
-          _selectedImageFile = File(pickedFile.path);
-          _avatarPreviewUrl = pickedFile.path; // Local file path for preview
-        });
+      if (pickedFile == null || !mounted) return;
 
-        // Automatically upload the photo
-        await _uploadPhoto();
-      }
+      // ── Instagram-like crop/zoom screen ──────────────────────────────
+      final File? croppedFile = await Navigator.push<File>(
+        context,
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => AvatarCropPage(imageFile: File(pickedFile.path)),
+        ),
+      );
+
+      if (croppedFile == null || !mounted) return;
+
+      setState(() {
+        _selectedImageFile = croppedFile;
+        _avatarPreviewUrl = croppedFile.path;
+      });
+
+      // Upload the cropped result
+      await _uploadPhoto();
     } catch (e) {
       print("🧪 [ManageProfile] Image picker error: $e");
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Failed to pick image: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Failed to pick image: $e")));
+      }
     }
   }
 
@@ -387,7 +402,6 @@ class _ManageProfilePageState extends State<ManageProfilePage> {
         ? const Color(0xFF171022)
         : const Color(0xFFF5F5F5);
 
-    final profile = widget.profileData["profile"] ?? {};
     final currentEmail = _originalEmail.isNotEmpty ? _originalEmail : "Not set";
 
     return Scaffold(
@@ -408,88 +422,100 @@ class _ManageProfilePageState extends State<ManageProfilePage> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // === BIG SQUARE AVATAR SECTION ===
-            SizedBox(
-              height: MediaQuery.of(context).size.height * 0.45,
-              width: double.infinity,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          width: MediaQuery.of(context).size.width * 0.72,
-                          height: MediaQuery.of(context).size.width * 0.72,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            border: Border.all(
-                              color: Colors.grey[400]!,
-                              width: 2,
-                            ),
-                          ),
-                          child: _isUploadingPhoto
-                              ? const Center(child: CircularProgressIndicator())
-                              : _selectedImageFile != null
-                              ? Image.file(
-                                  _selectedImageFile!,
-                                  fit: BoxFit.cover,
-                                )
-                              : _avatarPreviewUrl != null &&
-                                    _avatarPreviewUrl!.isNotEmpty &&
-                                    !_avatarPreviewUrl!.contains('placeholder')
-                              ? Image.network(
-                                  _avatarPreviewUrl!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      const Icon(
-                                        Icons.broken_image,
-                                        size: 90,
-                                        color: Colors.grey,
-                                      ),
-                                )
-                              : const Icon(
-                                  Icons.person,
-                                  size: 140,
-                                  color: Colors.grey,
-                                ),
+            // ── Avatar preview section ─────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.only(top: 32, bottom: 24),
+              child: Center(
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // Circle avatar
+                    Container(
+                      width: 140,
+                      height: 140,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.purple.shade300,
+                          width: 3,
                         ),
+                        color: Colors.grey[300],
                       ),
-
-                      // Edit button overlay
-                      Positioned(
-                        bottom: 8,
-                        right: 8,
-                        child: Material(
-                          color: Colors.blue[600],
-                          borderRadius: BorderRadius.circular(30),
-                          elevation: 4,
-                          child: InkWell(
-                            onTap: _isUploadingPhoto
-                                ? null
-                                : _showImageSourceDialog,
-                            borderRadius: BorderRadius.circular(30),
-                            child: const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: Icon(
-                                Icons.camera_alt,
-                                color: Colors.white,
-                                size: 24,
+                      child: ClipOval(
+                        child: _isUploadingPhoto
+                            ? const Center(child: CircularProgressIndicator())
+                            : _selectedImageFile != null
+                            ? Image.file(
+                                _selectedImageFile!,
+                                fit: BoxFit.cover,
+                                width: 140,
+                                height: 140,
+                              )
+                            : _avatarPreviewUrl != null &&
+                                  _avatarPreviewUrl!.isNotEmpty &&
+                                  !_avatarPreviewUrl!.contains('placeholder')
+                            ? Image.network(
+                                _avatarPreviewUrl!,
+                                fit: BoxFit.cover,
+                                width: 140,
+                                height: 140,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Icon(
+                                      Icons.person,
+                                      size: 70,
+                                      color: Colors.grey[600],
+                                    ),
+                              )
+                            : Icon(
+                                Icons.person,
+                                size: 70,
+                                color: Colors.grey[600],
                               ),
-                            ),
+                      ),
+                    ),
+
+                    // Camera button (bottom-right)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: _isUploadingPhoto
+                            ? null
+                            : _showImageSourceDialog,
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.purple,
+                            border: Border.all(color: Colors.white, width: 2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.18),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.camera_alt,
+                            color: Colors.white,
+                            size: 20,
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    "Tap the camera icon to change your photo",
-                    style: TextStyle(color: Colors.grey[600], fontSize: 15),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Hint text
+            Padding(
+              padding: const EdgeInsets.only(bottom: 24),
+              child: Text(
+                'Tap the camera icon to update your photo',
+                style: TextStyle(color: Colors.grey[600], fontSize: 13),
               ),
             ),
 
