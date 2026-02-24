@@ -182,7 +182,7 @@ class _MainAppShellState extends State<MainAppShell> {
   late final List<Widget> _pages = [
     TasksPage(onThemeChanged: widget.onThemeChanged),
     const AIChatPage(),
-    const CalendarPage(),
+    CalendarPage(onThemeChanged: widget.onThemeChanged),
   ];
 
   void _onItemTapped(int index) {

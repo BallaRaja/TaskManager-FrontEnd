@@ -21,6 +21,7 @@ class MonthlyView extends StatelessWidget {
     final controller = Provider.of<CalendarController>(context);
     final media = MediaQuery.of(context);
     final isSmallScreen = media.size.width < 360;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final DateTime focusedMonth = DateTime(
       controller.selectedDate.year,
@@ -60,21 +61,25 @@ class MonthlyView extends StatelessWidget {
               children: [
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  width: isSmallScreen ? 32 : 38,
-                  height: isSmallScreen ? 32 : 38,
+                  width: isSmallScreen ? 32 : 36,
+                  height: isSmallScreen ? 32 : 36,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isSelected ? Colors.purple : Colors.transparent,
+                    color: isSelected
+                        ? Colors.purple
+                        : (isDark
+                              ? Colors.white.withOpacity(0.08)
+                              : Colors.grey.withOpacity(0.12)),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   alignment: Alignment.center,
                   child: Text(
                     day.toString(),
                     style: TextStyle(
-                      fontSize: isSmallScreen ? 12 : 14,
-                      fontWeight: isSelected
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                      color: isSelected ? Colors.white : Colors.black87,
+                      fontSize: isSmallScreen ? 12 : 13,
+                      fontWeight: FontWeight.normal,
+                      color: isSelected
+                          ? Colors.white
+                          : (isDark ? Colors.white : Colors.black87),
                     ),
                   ),
                 ),
@@ -101,85 +106,150 @@ class MonthlyView extends StatelessWidget {
 
     return Column(
       children: [
-        // ───── Month Header ─────
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragEnd: (details) {
+            final velocity = details.primaryVelocity ?? 0;
+            if (velocity < -100) {
+              // swipe left → next month
+              controller.setSelectedDate(
+                DateTime(
+                  controller.selectedDate.year,
+                  controller.selectedDate.month + 1,
+                  1,
+                ),
+              );
+            } else if (velocity > 100) {
+              // swipe right → previous month
+              controller.setSelectedDate(
+                DateTime(
+                  controller.selectedDate.year,
+                  controller.selectedDate.month - 1,
+                  1,
+                ),
+              );
+            }
+          },
+          child: Column(
             children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left),
-                onPressed: () {
-                  controller.setSelectedDate(
-                    DateTime(
-                      controller.selectedDate.year,
-                      controller.selectedDate.month - 1,
-                      1,
+              // ───── Month Header ─────
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: () {
+                        controller.setSelectedDate(
+                          DateTime(
+                            controller.selectedDate.year,
+                            controller.selectedDate.month - 1,
+                            1,
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
-              Expanded(
-                child: Center(
-                  child: Text(
-                    DateFormat('MMMM yyyy').format(focusedMonth),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          DateFormat('MMMM yyyy').format(focusedMonth),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: () {
+                        controller.setSelectedDate(
+                          DateTime(
+                            controller.selectedDate.year,
+                            controller.selectedDate.month + 1,
+                            1,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right),
-                onPressed: () {
-                  controller.setSelectedDate(
-                    DateTime(
-                      controller.selectedDate.year,
-                      controller.selectedDate.month + 1,
-                      1,
+
+              // ───── Weekday Row ─────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children:
+                      const ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+                          .map(
+                            (day) => Expanded(
+                              child: Center(
+                                child: Text(
+                                  day,
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                ),
+              ),
+
+              const SizedBox(height: 6),
+
+              // ───── Calendar Grid with Slide Animation ─────
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 320),
+                transitionBuilder: (child, animation) {
+                  final direction = controller.navigationDirection;
+                  final slideIn =
+                      Tween<Offset>(
+                        begin: Offset(direction.toDouble(), 0),
+                        end: Offset.zero,
+                      ).animate(
+                        CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                        ),
+                      );
+                  return ClipRect(
+                    child: SlideTransition(
+                      position: slideIn,
+                      child: FadeTransition(opacity: animation, child: child),
                     ),
                   );
                 },
+                child: GridView.count(
+                  key: ValueKey('${focusedMonth.year}-${focusedMonth.month}'),
+                  crossAxisCount: 7,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  childAspectRatio: isSmallScreen ? 1.25 : 1.15,
+                  children: dayCells,
+                ),
               ),
             ],
           ),
         ),
 
-        // ───── Weekday Row ─────
+        const SizedBox(height: 12),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(
-            children: const ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-                .map(
-                  (day) => Expanded(
-                    child: Center(
-                      child: Text(
-                        day,
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: Colors.grey.withOpacity(0.35),
           ),
         ),
-
-        const SizedBox(height: 6),
-
-        // ───── Calendar Grid (NO FIXED HEIGHT) ─────
-        GridView.count(
-          crossAxisCount: 7,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: isSmallScreen ? 1.25 : 1.15,
-          children: dayCells,
-        ),
-
-        const Divider(height: 1),
+        const SizedBox(height: 4),
 
         // ───── Selected Day Header ─────
         Padding(

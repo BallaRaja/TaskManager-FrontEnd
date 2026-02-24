@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AppTheme {
@@ -44,6 +45,12 @@ class AppTheme {
       backgroundColor: lightSurface,
       foregroundColor: lightTextPrimary,
       elevation: 0,
+      systemOverlayStyle: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness:
+            Brightness.dark, // dark icons visible on light bg
+        statusBarBrightness: Brightness.light, // iOS
+      ),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: lightSurface,
@@ -79,6 +86,12 @@ class AppTheme {
       backgroundColor: darkSurface,
       foregroundColor: darkTextPrimary,
       elevation: 0,
+      systemOverlayStyle: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness:
+            Brightness.light, // light icons visible on dark bg
+        statusBarBrightness: Brightness.dark, // iOS
+      ),
     ),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: darkSurface,

@@ -1,64 +1,78 @@
-// lib/features/tasks/presentation/widgets/add_task_sheet.dart
+// lib/features/tasks/presentation/widgets/edit_task_sheet.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../tasks_controller.dart';
 
-void showAddTaskSheet(BuildContext context) {
+void showEditTaskSheet(BuildContext context, Map<String, dynamic> task) {
   final controller = Provider.of<TasksController>(context, listen: false);
-
-  if (controller.taskLists.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("No task list found. Please create one first."),
-      ),
-    );
-    return;
-  }
-
-  // Use the currently selected task list
-  final String currentTaskListId =
-      controller.taskLists[controller.selectedListIndex]["_id"] as String;
-
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) =>
-        AddTaskSheet(controller: controller, taskListId: currentTaskListId),
+    builder: (_) => EditTaskSheet(controller: controller, task: task),
   );
 }
 
-class AddTaskSheet extends StatefulWidget {
+class EditTaskSheet extends StatefulWidget {
   final TasksController controller;
-  final String taskListId; // The ID of the list to add the task to
+  final Map<String, dynamic> task;
 
-  const AddTaskSheet({
+  const EditTaskSheet({
     super.key,
     required this.controller,
-    required this.taskListId,
+    required this.task,
   });
 
   @override
-  State<AddTaskSheet> createState() => _AddTaskSheetState();
+  State<EditTaskSheet> createState() => _EditTaskSheetState();
 }
 
-class _AddTaskSheetState extends State<AddTaskSheet> {
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _notesController = TextEditingController();
+class _EditTaskSheetState extends State<EditTaskSheet> {
+  late final TextEditingController _titleController;
+  late final TextEditingController _notesController;
   final FocusNode _titleFocus = FocusNode();
 
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
   bool _isImportant = false;
-  String _repeatFrequency = 'none'; // 'none', 'daily', 'weekly', 'monthly'
-  List<String> _repeatDays = []; // For weekly repeat (e.g., ['mon', 'tue'])
+  String _repeatFrequency = 'none';
+  List<String> _repeatDays = [];
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _titleFocus.requestFocus(),
+
+    // Pre-fill title + notes
+    _titleController = TextEditingController(
+      text: widget.task['title'] as String? ?? '',
     );
+    _notesController = TextEditingController(
+      text: widget.task['notes'] as String? ?? '',
+    );
+
+    // Pre-fill due date + time
+    // Always convert UTC from backend → device local time before using
+    final dueDateStr = widget.task['dueDate'] as String?;
+    if (dueDateStr != null) {
+      final parsed = DateTime.tryParse(dueDateStr)?.toLocal();
+      if (parsed != null) {
+        _selectedDate = DateTime(parsed.year, parsed.month, parsed.day);
+        _selectedTime = TimeOfDay(hour: parsed.hour, minute: parsed.minute);
+      }
+    }
+
+    // Pre-fill priority
+    _isImportant = widget.task['priority'] == 'high';
+
+    // Pre-fill repeat
+    final repeat = widget.task['repeat'] as Map<String, dynamic>?;
+    if (repeat != null) {
+      _repeatFrequency = (repeat['frequency'] as String?) ?? 'none';
+      final days = repeat['daysOfWeek'];
+      if (days != null) {
+        _repeatDays = List<String>.from(days as List);
+      }
+    }
   }
 
   DateTime? get _fullDueDateTime {
@@ -118,7 +132,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate ?? DateTime.now(),
-      firstDate: DateTime.now(),
+      firstDate: DateTime(2000),
       lastDate: DateTime.now().add(const Duration(days: 365 * 10)),
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
@@ -154,7 +168,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
             ),
             child: Column(
               children: [
-                // Header
                 Container(
                   padding: const EdgeInsets.all(20),
                   child: Row(
@@ -176,7 +189,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                   ),
                 ),
                 const Divider(height: 1),
-                // Set time
                 ListTile(
                   leading: const Icon(Icons.access_time),
                   title: const Text('Set time'),
@@ -211,7 +223,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                     }
                   },
                 ),
-                // Repeat
                 ListTile(
                   leading: const Icon(Icons.repeat),
                   title: const Text('Repeat'),
@@ -232,7 +243,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                   },
                 ),
                 const Spacer(),
-                // Done button
                 Container(
                   padding: const EdgeInsets.all(16),
                   child: SizedBox(
@@ -319,7 +329,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                // Repeat frequency options
                 RadioListTile<String>(
                   title: const Text('Does not repeat'),
                   value: 'none',
@@ -352,7 +361,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                       _repeatFrequency = val!;
                       if (_repeatDays.isEmpty && _selectedDate != null) {
                         final weekday = _selectedDate!.weekday;
-                        final days = [
+                        const days = [
                           'mon',
                           'tue',
                           'wed',
@@ -380,7 +389,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                     _repeatDays.clear();
                   },
                 ),
-                // Weekly days selector
                 if (_repeatFrequency == 'weekly') ...[
                   const SizedBox(height: 30),
                   const Padding(
@@ -414,8 +422,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                             final selected = _repeatDays.contains(dayLower);
                             return GestureDetector(
                               onTap: () {
-                                if (selected && _repeatDays.length == 1)
-                                  return; // prevent deselecting last day
+                                if (selected && _repeatDays.length == 1) return;
                                 setState(() {
                                   selected
                                       ? _repeatDays.remove(dayLower)
@@ -457,8 +464,8 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                           }).toList(),
                     ),
                   ),
+                  const SizedBox(height: 40),
                 ],
-                const SizedBox(height: 40),
               ],
             ),
           ),
@@ -472,54 +479,45 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     if (title.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text("Title required")));
-      return;
-    }
-
-    if (_fullDueDateTime != null &&
-        _fullDueDateTime!.isBefore(DateTime.now())) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Due time cannot be in the past")),
-      );
+      ).showSnackBar(const SnackBar(content: Text('Title required')));
       return;
     }
 
     Map<String, dynamic>? repeat;
     if (_repeatFrequency != 'none') {
       repeat = {
-        "frequency": _repeatFrequency,
-        "interval": 1,
+        'frequency': _repeatFrequency,
+        'interval': 1,
         if (_repeatFrequency == 'weekly' && _repeatDays.isNotEmpty)
-          "daysOfWeek": _repeatDays,
+          'daysOfWeek': _repeatDays,
       };
     }
 
-    final body = {
-      "title": title,
-      "taskListId": widget.taskListId, // Now uses the currently selected list
-      if (_notesController.text.trim().isNotEmpty)
-        "notes": _notesController.text.trim(),
+    final body = <String, dynamic>{
+      'title': title,
+      'notes': _notesController.text.trim(),
+      'priority': _isImportant ? 'high' : 'medium',
       if (_fullDueDateTime != null)
         // Send as UTC so backend stores a timezone-unambiguous value
-        "dueDate": _fullDueDateTime!.toUtc().toIso8601String(),
-      "priority": _isImportant ? "high" : "medium",
-      if (repeat != null) "repeat": repeat,
+        'dueDate': _fullDueDateTime!.toUtc().toIso8601String()
+      else
+        'dueDate': null,
+      'repeat': repeat,
     };
 
-    print("📤 Saving task: $body");
+    final taskId = widget.task['_id'].toString();
+    final updated = await widget.controller.updateTask(taskId, body);
 
-    try {
-      await widget.controller.createTask(body);
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Task created!")));
-        Navigator.pop(context);
-      }
-    } catch (e) {
+    if (!mounted) return;
+    if (updated != null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text("Error: $e")));
+      ).showSnackBar(const SnackBar(content: Text('Task updated!')));
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Failed to update task')));
     }
   }
 
@@ -550,6 +548,33 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
+              // Header row with title
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const Expanded(
+                      child: Center(
+                        child: Text(
+                          'Edit Task',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 48),
+                  ],
+                ),
+              ),
               Expanded(
                 child: ListView(
                   controller: scrollController,
@@ -563,7 +588,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                         fontWeight: FontWeight.w600,
                       ),
                       decoration: const InputDecoration(
-                        hintText: "New Task",
+                        hintText: 'Task title',
                         border: InputBorder.none,
                       ),
                     ),
@@ -572,7 +597,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                       controller: _notesController,
                       style: const TextStyle(fontSize: 16),
                       decoration: const InputDecoration(
-                        hintText: "Add details",
+                        hintText: 'Add details',
                         border: InputBorder.none,
                       ),
                       maxLines: null,
@@ -583,7 +608,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                         Expanded(
                           child: _actionButton(
                             Icons.calendar_today,
-                            "Add date",
+                            'Date & Time',
                             _openDatePicker,
                             _selectedDate != null,
                           ),
@@ -592,7 +617,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                         Expanded(
                           child: _actionButton(
                             _isImportant ? Icons.star : Icons.star_border,
-                            "Important",
+                            'Important',
                             () => setState(() => _isImportant = !_isImportant),
                             _isImportant,
                             color: _isImportant ? Colors.amber : null,
@@ -616,14 +641,14 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              "Summary",
+                              'Summary',
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 12),
                             if (_selectedDate != null)
                               _summaryRow(
                                 Icons.calendar_today,
-                                "${_formatSelectedDate()} • ${_formatTime(_selectedTime)}",
+                                '${_formatSelectedDate()} • ${_formatTime(_selectedTime)}',
                                 () => setState(() {
                                   _selectedDate = null;
                                   _selectedTime = null;
@@ -643,7 +668,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                             if (_isImportant)
                               _summaryRow(
                                 Icons.star,
-                                "Important",
+                                'Important',
                                 () => setState(() => _isImportant = false),
                               ),
                           ],
@@ -666,14 +691,14 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                     backgroundColor: Colors.purple,
                     padding: const EdgeInsets.symmetric(
                       vertical: 16,
-                      horizontal: 25,
+                      horizontal: 28,
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
                   child: const Text(
-                    "Save",
+                    'Save Changes',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,

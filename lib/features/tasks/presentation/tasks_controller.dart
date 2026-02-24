@@ -4,9 +4,12 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/utils/session_manager.dart';
+
+enum TaskListSortMode { custom, az, za }
 
 class TasksController extends ChangeNotifier {
   String? _avatarUrl;
@@ -15,6 +18,11 @@ class TasksController extends ChangeNotifier {
   final List<Map<String, dynamic>> _taskLists = [];
   bool _isLoading = true;
   int _selectedListIndex = 0;
+
+  // ── Ordering state ──
+  TaskListSortMode _listSortMode = TaskListSortMode.custom;
+  List<String> _customListOrder = []; // IDs of non-default lists
+  final Map<String, List<String>> _taskOrders = {}; // listId → ordered taskIds
 
   String? _userId;
   String? _token;
@@ -25,6 +33,7 @@ class TasksController extends ChangeNotifier {
   List<Map<String, dynamic>> get taskLists => _taskLists;
   bool get isLoading => _isLoading;
   int get selectedListIndex => _selectedListIndex;
+  TaskListSortMode get listSortMode => _listSortMode;
 
   Future<void> init() async {
     _token = await SessionManager.getToken();
@@ -37,11 +46,16 @@ class TasksController extends ChangeNotifier {
       return;
     }
 
+    // Load persisted sort prefs before fetching (so _sortTaskLists uses them)
+    await Future.wait([_loadListSortMode(), _loadCustomListOrder()]);
+
     await Future.wait([
       _fetchProfileAvatar(),
       _fetchTaskLists(),
       _fetchTasks(),
     ]);
+
+    await _loadAllTaskOrders();
 
     _isLoading = false;
     notifyListeners();
@@ -135,6 +149,58 @@ class TasksController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<void> deleteTaskList(String listId) async {
+    _token ??= await SessionManager.getToken();
+    if (_token == null) return;
+
+    try {
+      final response = await http.delete(
+        Uri.parse('${ApiConstants.backendUrl}/api/taskList/$listId'),
+        headers: {'Authorization': 'Bearer $_token'},
+      );
+
+      if (response.statusCode == 200) {
+        _taskLists.removeWhere((l) => l['_id']?.toString() == listId);
+        _tasks.removeWhere((t) => t['taskListId']?.toString() == listId);
+        _selectedListIndex = 0;
+        notifyListeners();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> renameTaskList(String listId, String newTitle) async {
+    _token ??= await SessionManager.getToken();
+    if (_token == null) return;
+
+    final trimmed = newTitle.trim();
+    if (trimmed.isEmpty) return;
+
+    try {
+      final response = await http.put(
+        Uri.parse('${ApiConstants.backendUrl}/api/taskList/$listId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+        body: jsonEncode({'title': trimmed}),
+      );
+
+      if (response.statusCode == 200) {
+        final updated =
+            jsonDecode(response.body)['data'] as Map<String, dynamic>?;
+        if (updated != null) {
+          final idx = _taskLists.indexWhere(
+            (l) => l['_id']?.toString() == listId,
+          );
+          if (idx != -1) {
+            _taskLists[idx] = updated;
+            notifyListeners();
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
   Future<void> createTask(Map<String, dynamic> taskData) async {
     _token ??= await SessionManager.getToken();
     if (_token == null) return;
@@ -153,6 +219,33 @@ class TasksController extends ChangeNotifier {
         await _fetchTasks();
       }
     } catch (_) {}
+  }
+
+  Future<Map<String, dynamic>?> updateTask(
+    String taskId,
+    Map<String, dynamic> data,
+  ) async {
+    _token ??= await SessionManager.getToken();
+    if (_token == null) return null;
+
+    try {
+      final response = await http.put(
+        Uri.parse('${ApiConstants.backendUrl}/api/task/$taskId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+        body: jsonEncode(data),
+      );
+
+      if (response.statusCode == 200) {
+        final updated =
+            jsonDecode(response.body)['data'] as Map<String, dynamic>?;
+        if (updated != null) upsertTaskLocal(updated);
+        return updated;
+      }
+    } catch (_) {}
+    return null;
   }
 
   void upsertTaskLocal(Map<String, dynamic> updatedTask) {
@@ -178,15 +271,140 @@ class TasksController extends ChangeNotifier {
       if (a['isDefault'] == true) return -1;
       if (b['isDefault'] == true) return 1;
 
-      final DateTime dateA =
-          DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0);
-      final DateTime dateB =
-          DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
-          DateTime.fromMillisecondsSinceEpoch(0);
-
-      return dateB.compareTo(dateA);
+      switch (_listSortMode) {
+        case TaskListSortMode.az:
+          return (a['title']?.toString() ?? '').toLowerCase().compareTo(
+            (b['title']?.toString() ?? '').toLowerCase(),
+          );
+        case TaskListSortMode.za:
+          return (b['title']?.toString() ?? '').toLowerCase().compareTo(
+            (a['title']?.toString() ?? '').toLowerCase(),
+          );
+        case TaskListSortMode.custom:
+          final aId = a['_id']?.toString() ?? '';
+          final bId = b['_id']?.toString() ?? '';
+          final aIdx = _customListOrder.indexOf(aId);
+          final bIdx = _customListOrder.indexOf(bId);
+          if (aIdx == -1 && bIdx == -1) {
+            // Both not in custom order yet → sort by createdAt desc
+            final dateA =
+                DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
+                DateTime.fromMillisecondsSinceEpoch(0);
+            final dateB =
+                DateTime.tryParse(b['createdAt']?.toString() ?? '') ??
+                DateTime.fromMillisecondsSinceEpoch(0);
+            return dateB.compareTo(dateA);
+          }
+          if (aIdx == -1) return 1;
+          if (bIdx == -1) return -1;
+          return aIdx.compareTo(bIdx);
+      }
     });
+  }
+
+  // ── Sort-mode & order persistence ──────────────────────────
+
+  Future<void> _loadListSortMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final modeStr = prefs.getString('list_sort_mode') ?? 'custom';
+    _listSortMode = TaskListSortMode.values.firstWhere(
+      (e) => e.name == modeStr,
+      orElse: () => TaskListSortMode.custom,
+    );
+  }
+
+  Future<void> _saveListSortMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('list_sort_mode', _listSortMode.name);
+  }
+
+  Future<void> _loadCustomListOrder() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('custom_list_order');
+    if (raw != null) {
+      _customListOrder = List<String>.from(jsonDecode(raw));
+    }
+  }
+
+  Future<void> _saveCustomListOrder() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('custom_list_order', jsonEncode(_customListOrder));
+  }
+
+  Future<void> _loadAllTaskOrders() async {
+    final prefs = await SharedPreferences.getInstance();
+    for (final list in _taskLists) {
+      final listId = list['_id']?.toString();
+      if (listId == null) continue;
+      final raw = prefs.getString('task_order_$listId');
+      if (raw != null) {
+        _taskOrders[listId] = List<String>.from(jsonDecode(raw));
+      }
+    }
+  }
+
+  // ── Public ordering API ─────────────────────────────────────
+
+  /// Change sort mode for the lists panel.
+  Future<void> setListSortMode(TaskListSortMode mode) async {
+    _listSortMode = mode;
+    await _saveListSortMode();
+    _sortTaskLists();
+    notifyListeners();
+  }
+
+  /// Drag-reorder non-default lists (indices into non-default slice).
+  Future<void> reorderLists(int oldIndex, int newIndex) async {
+    final nonDefault = _taskLists.where((l) => l['isDefault'] != true).toList();
+    if (oldIndex < 0 ||
+        oldIndex >= nonDefault.length ||
+        newIndex < 0 ||
+        newIndex >= nonDefault.length) {
+      return;
+    }
+
+    final ids = nonDefault.map((l) => l['_id'].toString()).toList();
+    final moved = ids.removeAt(oldIndex);
+    ids.insert(newIndex, moved);
+    _customListOrder = ids;
+
+    await _saveCustomListOrder();
+    _sortTaskLists();
+    notifyListeners();
+  }
+
+  /// Returns [pending] tasks sorted by the stored custom order for [listId].
+  List<Map<String, dynamic>> getOrderedPendingTasks(
+    String listId,
+    List<Map<String, dynamic>> pending,
+  ) {
+    final order = _taskOrders[listId];
+    if (order == null || order.isEmpty) return pending;
+    final result = <Map<String, dynamic>>[];
+    final remaining = List<Map<String, dynamic>>.from(pending);
+    for (final id in order) {
+      final idx = remaining.indexWhere((t) => t['_id']?.toString() == id);
+      if (idx != -1) result.add(remaining.removeAt(idx));
+    }
+    result.addAll(remaining); // new tasks not yet in the order go last
+    return result;
+  }
+
+  /// Persist a new task order after a drag.
+  Future<void> reorderTasks(
+    String listId,
+    int oldIndex,
+    int newIndex,
+    List<Map<String, dynamic>> displayedOrdered,
+  ) async {
+    final ids = displayedOrdered.map((t) => t['_id'].toString()).toList();
+    final moved = ids.removeAt(oldIndex);
+    ids.insert(newIndex, moved);
+    _taskOrders[listId] = ids;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('task_order_$listId', jsonEncode(ids));
+    notifyListeners();
   }
 
   Future<void> _fetchTaskLists() async {
@@ -264,6 +482,7 @@ class TasksController extends ChangeNotifier {
     }
 
     await Future.wait([_fetchTaskLists(), _fetchTasks()]);
+    await _loadAllTaskOrders();
 
     _isLoading = false;
     notifyListeners();
