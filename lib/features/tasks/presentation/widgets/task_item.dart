@@ -16,7 +16,8 @@ class TaskItem extends StatelessWidget {
 
   String? _formatDueDate(String? iso) {
     if (iso == null) return null;
-    final date = DateTime.parse(iso);
+    // Convert UTC from backend → device local time for display
+    final date = DateTime.parse(iso).toLocal();
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final taskDay = DateTime(date.year, date.month, date.day);
@@ -48,6 +49,17 @@ class TaskItem extends StatelessWidget {
     if (token == null) return;
     final newStatus = isCompleted ? "pending" : "completed";
     final taskId = task["_id"].toString();
+
+    // Optimistic update — immediately reflect the change in UI
+    final optimisticTask = Map<String, dynamic>.from(task);
+    optimisticTask["status"] = newStatus;
+    if (!isCompleted) {
+      optimisticTask["completedAt"] = DateTime.now().toIso8601String();
+    } else {
+      optimisticTask["completedAt"] = null;
+    }
+    if (context.mounted) _updateLocalTask(context, optimisticTask);
+
     try {
       final response = await http.put(
         Uri.parse("${ApiConstants.backendUrl}/api/task/$taskId"),
@@ -63,9 +75,19 @@ class TaskItem extends StatelessWidget {
       );
       if (response.statusCode == 200) {
         final updatedTask = jsonDecode(response.body)["data"];
-        _updateLocalTask(context, updatedTask);
+        if (context.mounted) _updateLocalTask(context, updatedTask);
+      } else {
+        // Revert optimistic update on server error
+        if (context.mounted) _updateLocalTask(context, task);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Failed to update task")),
+          );
+        }
       }
     } catch (e) {
+      // Revert optimistic update on network error
+      if (context.mounted) _updateLocalTask(context, task);
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,

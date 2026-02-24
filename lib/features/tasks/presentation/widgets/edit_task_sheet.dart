@@ -51,9 +51,10 @@ class _EditTaskSheetState extends State<EditTaskSheet> {
     );
 
     // Pre-fill due date + time
+    // Always convert UTC from backend → device local time before using
     final dueDateStr = widget.task['dueDate'] as String?;
     if (dueDateStr != null) {
-      final parsed = DateTime.tryParse(dueDateStr);
+      final parsed = DateTime.tryParse(dueDateStr)?.toLocal();
       if (parsed != null) {
         _selectedDate = DateTime(parsed.year, parsed.month, parsed.day);
         _selectedTime = TimeOfDay(hour: parsed.hour, minute: parsed.minute);
@@ -497,7 +498,8 @@ class _EditTaskSheetState extends State<EditTaskSheet> {
       'notes': _notesController.text.trim(),
       'priority': _isImportant ? 'high' : 'medium',
       if (_fullDueDateTime != null)
-        'dueDate': _fullDueDateTime!.toIso8601String()
+        // Send as UTC so backend stores a timezone-unambiguous value
+        'dueDate': _fullDueDateTime!.toUtc().toIso8601String()
       else
         'dueDate': null,
       'repeat': repeat,

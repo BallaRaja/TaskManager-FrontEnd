@@ -116,7 +116,8 @@ class CalendarController extends ChangeNotifier {
   bool hasInstanceOnDate(Map<String, dynamic> task, DateTime date) {
     final dueStr = task["dueDate"];
     if (dueStr == null) return false;
-    final baseDue = DateTime.parse(dueStr);
+    // Convert UTC → local so day comparisons use device timezone
+    final baseDue = DateTime.parse(dueStr).toLocal();
     final repeat = task["repeat"] as Map<String, dynamic>?;
 
     if (repeat == null) {
@@ -124,7 +125,7 @@ class CalendarController extends ChangeNotifier {
     }
 
     final untilStr = repeat["until"];
-    final until = untilStr != null ? DateTime.parse(untilStr) : null;
+    final until = untilStr != null ? DateTime.parse(untilStr).toLocal() : null;
     if (until != null && date.isAfter(until)) return false;
 
     final frequency = repeat["frequency"] as String;
@@ -166,7 +167,8 @@ class CalendarController extends ChangeNotifier {
       final dueStr = task["dueDate"] as String?;
       if (dueStr == null) continue;
 
-      final baseDue = DateTime.parse(dueStr);
+      // Convert UTC → local for correct hour/minute assignment
+      final baseDue = DateTime.parse(dueStr).toLocal();
       if (hasInstanceOnDate(task, normalizedDate)) {
         final instance = Map<String, dynamic>.from(task);
         final instanceDue = DateTime(
@@ -176,7 +178,8 @@ class CalendarController extends ChangeNotifier {
           baseDue.hour,
           baseDue.minute,
         );
-        instance["dueDate"] = instanceDue.toIso8601String();
+        // Store as UTC for consistent internal representation
+        instance["dueDate"] = instanceDue.toUtc().toIso8601String();
         instances.add(instance);
       }
     }
@@ -198,14 +201,15 @@ class CalendarController extends ChangeNotifier {
       final dueStr = task["dueDate"] as String?;
       if (dueStr == null) continue;
 
-      final baseDue = DateTime.parse(dueStr);
+      // Convert UTC → local for correct day/time comparisons
+      final baseDue = DateTime.parse(dueStr).toLocal();
       DateTime current = baseDue;
       final repeat = task["repeat"] as Map<String, dynamic>?;
 
       while (current.isBefore(now) && current.isAfter(cutoff)) {
         if (hasInstanceOnDate(task, current)) {
           final instance = Map<String, dynamic>.from(task);
-          instance["dueDate"] = current.toIso8601String();
+          instance["dueDate"] = current.toUtc().toIso8601String();
           overdue.add(instance);
         }
         if (repeat == null) break;

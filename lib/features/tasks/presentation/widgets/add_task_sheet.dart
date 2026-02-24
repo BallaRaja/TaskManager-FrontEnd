@@ -500,7 +500,8 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       if (_notesController.text.trim().isNotEmpty)
         "notes": _notesController.text.trim(),
       if (_fullDueDateTime != null)
-        "dueDate": _fullDueDateTime!.toIso8601String(),
+        // Send as UTC so backend stores a timezone-unambiguous value
+        "dueDate": _fullDueDateTime!.toUtc().toIso8601String(),
       "priority": _isImportant ? "high" : "medium",
       if (repeat != null) "repeat": repeat,
     };

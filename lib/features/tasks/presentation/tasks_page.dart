@@ -335,52 +335,141 @@ class _TasksPageState extends State<TasksPage> {
     );
   }
 
-  void _showViewMenu(BuildContext context) {
-    showModalBottomSheet(
+  void _openSidePanel(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final panelWidth = MediaQuery.of(context).size.width * 0.78;
+
+    showGeneralDialog(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text(
-                "Views",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      barrierDismissible: true,
+      barrierLabel: 'Close',
+      barrierColor: Colors.black.withOpacity(0.48),
+      transitionDuration: const Duration(milliseconds: 280),
+      pageBuilder: (ctx, _, __) => Align(
+        alignment: Alignment.centerLeft,
+        child: Material(
+          color: isDark ? const Color(0xFF1C1B2E) : Colors.white,
+          child: SizedBox(
+            width: panelWidth,
+            height: double.infinity,
+            child: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Header ──
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 28, 20, 12),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.purple.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.check_circle_outline_rounded,
+                            color: Colors.purple,
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Task Manager',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
+                    child: Text(
+                      'VIEWS',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.grey,
+                        letterSpacing: 1.4,
+                      ),
+                    ),
+                  ),
+                  _panelTile(
+                    ctx,
+                    Icons.list_alt_rounded,
+                    'All Tasks',
+                    () {
+                      Navigator.pop(ctx);
+                      setState(() => _viewType = TaskViewType.normal);
+                    },
+                    _viewType == TaskViewType.normal,
+                  ),
+                  _panelTile(
+                    ctx,
+                    Icons.star_rounded,
+                    'Starred',
+                    () {
+                      Navigator.pop(ctx);
+                      setState(() => _viewType = TaskViewType.starred);
+                    },
+                    _viewType == TaskViewType.starred,
+                  ),
+                  _panelTile(
+                    ctx,
+                    Icons.inventory_2_outlined,
+                    'Archived',
+                    () {
+                      Navigator.pop(ctx);
+                      setState(() => _viewType = TaskViewType.archived);
+                    },
+                    _viewType == TaskViewType.archived,
+                  ),
+                ],
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.star, color: Colors.amber),
-              title: const Text("Starred"),
-              onTap: () {
-                Navigator.pop(ctx);
-                setState(() {
-                  _viewType = TaskViewType.starred;
-                });
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.archive),
-              title: const Text("Archived"),
-              onTap: () {
-                Navigator.pop(ctx);
-                setState(() {
-                  _viewType = TaskViewType.archived;
-                });
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.close),
-              title: const Text("Close"),
-              onTap: () => Navigator.pop(ctx),
-            ),
-            const SizedBox(height: 20),
-          ],
+          ),
         ),
+      ),
+      transitionBuilder: (ctx, anim, _, child) => SlideTransition(
+        position: Tween(
+          begin: const Offset(-1, 0),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _panelTile(
+    BuildContext ctx,
+    IconData icon,
+    String label,
+    VoidCallback onTap,
+    bool isActive,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      child: ListTile(
+        leading: Icon(
+          icon,
+          color: isActive ? Colors.purple : Colors.grey[600],
+          size: 22,
+        ),
+        title: Text(
+          label,
+          style: TextStyle(
+            fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+            color: isActive ? Colors.purple : null,
+          ),
+        ),
+        tileColor: isActive ? Colors.purple.withOpacity(0.08) : null,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+        onTap: onTap,
       ),
     );
   }
@@ -442,7 +531,7 @@ class _TasksPageState extends State<TasksPage> {
                 leading: _viewType == TaskViewType.normal
                     ? IconButton(
                         icon: const Icon(Icons.menu),
-                        onPressed: () => _showViewMenu(context),
+                        onPressed: () => _openSidePanel(context),
                       )
                     : IconButton(
                         icon: const Icon(Icons.arrow_back),
