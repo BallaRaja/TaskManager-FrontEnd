@@ -107,6 +107,43 @@ class CalendarController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Toggle a task's completion status and refresh the list.
+  Future<bool> toggleTaskComplete(Map<String, dynamic> task) async {
+    final token = _token ?? await SessionManager.getToken();
+    if (token == null) return false;
+    final taskId = task['_id']?.toString();
+    if (taskId == null) return false;
+
+    final newStatus = task['status'] == 'completed' ? 'pending' : 'completed';
+
+    try {
+      final response = await http.put(
+        Uri.parse('${ApiConstants.backendUrl}/api/task/$taskId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'status': newStatus,
+          if (newStatus == 'completed')
+            'completedAt': DateTime.now().toIso8601String(),
+          if (newStatus == 'pending') 'completedAt': null,
+        }),
+      );
+      if (response.statusCode == 200) {
+        // Update in-memory task list
+        final idx = _tasks.indexWhere((t) => t['_id']?.toString() == taskId);
+        if (idx != -1) {
+          _tasks[idx] = Map<String, dynamic>.from(_tasks[idx]);
+          _tasks[idx]['status'] = newStatus;
+        }
+        notifyListeners();
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
   // Public method to refresh avatar only
   Future<void> refreshAvatar() async {
     await _fetchProfileAvatar();

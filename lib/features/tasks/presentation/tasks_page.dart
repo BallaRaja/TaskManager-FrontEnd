@@ -6,6 +6,9 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
 import '../../profile/presentation/profile_sheet.dart';
+import '../../auth/presentation/login_page.dart';
+import '../../../core/utils/session_manager.dart';
+import 'summary_page.dart';
 import 'tasks_controller.dart';
 import 'task_view_type.dart';
 import 'widgets/task_list_tab.dart';
@@ -401,16 +404,6 @@ class _TasksPageState extends State<TasksPage> {
                   ),
                   _panelTile(
                     ctx,
-                    Icons.list_alt_rounded,
-                    'All Tasks',
-                    () {
-                      Navigator.pop(ctx);
-                      setState(() => _viewType = TaskViewType.normal);
-                    },
-                    _viewType == TaskViewType.normal,
-                  ),
-                  _panelTile(
-                    ctx,
                     Icons.star_rounded,
                     'Starred',
                     () {
@@ -429,9 +422,19 @@ class _TasksPageState extends State<TasksPage> {
                     },
                     _viewType == TaskViewType.archived,
                   ),
-                  // ── MY LISTS section ──
-                  if (controller.taskLists.isNotEmpty)
-                    ..._buildSidePanelLists(ctx, controller),
+                  _panelTile(ctx, Icons.person_outline_rounded, 'Profile', () {
+                    Navigator.pop(ctx);
+                    _showProfileSheet(context);
+                  }, false),
+                  _panelTile(ctx, Icons.bar_chart_rounded, 'Summary', () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SummaryPage()),
+                    );
+                  }, false),
+                  // ── MY LISTS + Logout section ──
+                  ..._buildSidePanelLists(ctx, controller),
                 ],
               ),
             ),
@@ -485,80 +488,134 @@ class _TasksPageState extends State<TasksPage> {
         ),
       ),
       Expanded(
-        child: ListView.builder(
-          padding: const EdgeInsets.only(bottom: 24),
-          itemCount: controller.taskLists.length,
-          itemBuilder: (_, i) {
-            final list = controller.taskLists[i];
-            final String listTitle = list['title']?.toString() ?? 'Untitled';
-            final String listId = list['_id']?.toString() ?? '';
-            final int taskCount = controller.tasks
-                .where(
-                  (t) =>
-                      t['taskListId']?.toString() == listId &&
-                      t['status'] != 'completed',
-                )
-                .length;
-            final bool isDefault = list['isDefault'] == true;
-            final bool isSelected =
-                _viewType == TaskViewType.normal &&
-                i == controller.selectedListIndex;
+        child: ClipRect(
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  clipBehavior: Clip.hardEdge,
+                  padding: const EdgeInsets.only(bottom: 8),
+                  itemCount: controller.taskLists.length,
+                  itemBuilder: (_, i) {
+                    final list = controller.taskLists[i];
+                    final String listTitle =
+                        list['title']?.toString() ?? 'Untitled';
+                    final String listId = list['_id']?.toString() ?? '';
+                    final int taskCount = controller.tasks
+                        .where(
+                          (t) =>
+                              t['taskListId']?.toString() == listId &&
+                              t['status'] != 'completed',
+                        )
+                        .length;
+                    final bool isDefault = list['isDefault'] == true;
+                    final bool isSelected =
+                        _viewType == TaskViewType.normal &&
+                        i == controller.selectedListIndex;
 
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-              child: ListTile(
-                leading: Icon(
-                  isDefault ? Icons.inbox_rounded : Icons.list_alt_rounded,
-                  color: isSelected ? Colors.purple : Colors.grey[600],
-                  size: 22,
-                ),
-                title: Text(
-                  listTitle,
-                  style: TextStyle(
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                    color: isSelected ? Colors.purple : null,
-                  ),
-                ),
-                trailing: taskCount > 0
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 2,
+                      ),
+                      child: ListTile(
+                        leading: Icon(
+                          isDefault
+                              ? Icons.inbox_rounded
+                              : Icons.list_alt_rounded,
+                          color: isSelected ? Colors.purple : Colors.grey[600],
+                          size: 22,
                         ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? Colors.purple
-                              : Colors.grey.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '$taskCount',
+                        title: Text(
+                          listTitle,
                           style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? Colors.white : Colors.grey[700],
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                            color: isSelected ? Colors.purple : null,
                           ),
                         ),
-                      )
-                    : null,
-                tileColor: isSelected ? Colors.purple.withOpacity(0.08) : null,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                        trailing: taskCount > 0
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? Colors.purple
+                                      : Colors.grey.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '$taskCount',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.grey[700],
+                                  ),
+                                ),
+                              )
+                            : null,
+                        tileColor: isSelected
+                            ? Colors.purple.withOpacity(0.08)
+                            : null,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 2,
+                        ),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          setState(() {
+                            _viewType = TaskViewType.normal;
+                          });
+                          controller.selectList(i);
+                        },
+                      ),
+                    );
+                  },
                 ),
+              ),
+              const Divider(height: 1),
+              ListTile(
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 2,
                 ),
-                onTap: () {
+                leading: const Icon(Icons.logout_rounded, color: Colors.red),
+                title: const Text(
+                  'Logout',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                onTap: () async {
                   Navigator.pop(ctx);
-                  setState(() {
-                    _viewType = TaskViewType.normal;
-                  });
-                  controller.selectList(i);
+                  await SessionManager.clearSession();
+                  if (context.mounted) {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            LoginPage(onThemeChanged: widget.onThemeChanged),
+                      ),
+                      (route) => false,
+                    );
+                  }
                 },
               ),
-            );
-          },
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     ];
@@ -722,13 +779,13 @@ class _TasksPageState extends State<TasksPage> {
         minChildSize: 0.4,
         maxChildSize: 0.9,
         builder: (sheetCtx, scrollCtrl) {
-          // Non-default lists only
-          final nonDefault = controller.taskLists
-              .where((l) => l['isDefault'] != true)
-              .toList();
-
           return StatefulBuilder(
             builder: (sheetCtx, setSheetState) {
+              // Re-read on every setState so the list reflects the latest order
+              final nonDefault = controller.taskLists
+                  .where((l) => l['isDefault'] != true)
+                  .toList();
+
               return Container(
                 decoration: BoxDecoration(
                   color: Theme.of(panelCtx).scaffoldBackgroundColor,
@@ -881,6 +938,7 @@ class _TasksPageState extends State<TasksPage> {
           List<Map<String, dynamic>> displayedTasks = controller.tasks;
           Map<String, dynamic>? activeList; // non-null only for custom lists
           String? currentListId;
+          bool isDefaultList = false;
 
           if (_viewType == TaskViewType.normal) {
             if (controller.taskLists.isNotEmpty) {
@@ -894,6 +952,19 @@ class _TasksPageState extends State<TasksPage> {
                       (task) => task["taskListId"]?.toString() == currentListId,
                     )
                     .toList();
+              } else {
+                // Default "My Tasks" list → show only tasks due today
+                isDefaultList = true;
+                final now = DateTime.now();
+                final today = DateTime(now.year, now.month, now.day);
+                displayedTasks = controller.tasks.where((task) {
+                  final dueStr = task['dueDate'] as String?;
+                  if (dueStr == null || dueStr.isEmpty) return false;
+                  final due = DateTime.tryParse(dueStr)?.toLocal();
+                  if (due == null) return false;
+                  final dueDay = DateTime(due.year, due.month, due.day);
+                  return dueDay == today;
+                }).toList();
               }
             }
           } else if (_viewType == TaskViewType.starred) {
@@ -950,6 +1021,8 @@ class _TasksPageState extends State<TasksPage> {
                           ? "Starred"
                           : _viewType == TaskViewType.archived
                           ? "Archived"
+                          : isDefaultList
+                          ? "Today"
                           : "Tasks",
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
@@ -1028,6 +1101,40 @@ class _TasksPageState extends State<TasksPage> {
                       activeList,
                       orderedPending.length,
                       completed.length,
+                    ),
+                  // "Today" empty state
+                  if (isDefaultList &&
+                      orderedPending.isEmpty &&
+                      completed.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 60),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.wb_sunny_outlined,
+                            size: 64,
+                            color: Colors.grey[300],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No tasks due today',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Enjoy your day or add a task with a due date set to today.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[400],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   // Reorderable pending tasks (long-press to drag)
                   ReorderableListView.builder(

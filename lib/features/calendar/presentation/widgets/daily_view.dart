@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../calendar_controller.dart';
-import '../../../tasks/presentation/widgets/task_item.dart';
+import 'calendar_task_tile.dart';
 
 class DailyView extends StatelessWidget {
   const DailyView({super.key});
@@ -29,7 +29,7 @@ class DailyView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          ...overdue.map((t) => TaskItem(task: t, isCompleted: false)),
+          ...overdue.map((t) => CalendarTaskTile(task: t)),
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -46,9 +46,7 @@ class DailyView extends StatelessWidget {
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-        ...todayTasks.map(
-          (t) => TaskItem(task: t, isCompleted: t["status"] == "completed"),
-        ),
+        ...todayTasks.map((t) => CalendarTaskTile(task: t)),
         const SizedBox(height: 12),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -64,9 +62,7 @@ class DailyView extends StatelessWidget {
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-        ...tomorrowTasks.map(
-          (t) => TaskItem(task: t, isCompleted: t["status"] == "completed"),
-        ),
+        ...tomorrowTasks.map((t) => CalendarTaskTile(task: t)),
         const SizedBox(height: 100),
       ],
     );
