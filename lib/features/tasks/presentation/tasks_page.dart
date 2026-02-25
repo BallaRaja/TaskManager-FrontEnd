@@ -779,13 +779,13 @@ class _TasksPageState extends State<TasksPage> {
         minChildSize: 0.4,
         maxChildSize: 0.9,
         builder: (sheetCtx, scrollCtrl) {
-          // Non-default lists only
-          final nonDefault = controller.taskLists
-              .where((l) => l['isDefault'] != true)
-              .toList();
-
           return StatefulBuilder(
             builder: (sheetCtx, setSheetState) {
+              // Re-read on every setState so the list reflects the latest order
+              final nonDefault = controller.taskLists
+                  .where((l) => l['isDefault'] != true)
+                  .toList();
+
               return Container(
                 decoration: BoxDecoration(
                   color: Theme.of(panelCtx).scaffoldBackgroundColor,
@@ -938,6 +938,7 @@ class _TasksPageState extends State<TasksPage> {
           List<Map<String, dynamic>> displayedTasks = controller.tasks;
           Map<String, dynamic>? activeList; // non-null only for custom lists
           String? currentListId;
+          bool isDefaultList = false;
 
           if (_viewType == TaskViewType.normal) {
             if (controller.taskLists.isNotEmpty) {
@@ -951,6 +952,19 @@ class _TasksPageState extends State<TasksPage> {
                       (task) => task["taskListId"]?.toString() == currentListId,
                     )
                     .toList();
+              } else {
+                // Default "My Tasks" list → show only tasks due today
+                isDefaultList = true;
+                final now = DateTime.now();
+                final today = DateTime(now.year, now.month, now.day);
+                displayedTasks = controller.tasks.where((task) {
+                  final dueStr = task['dueDate'] as String?;
+                  if (dueStr == null || dueStr.isEmpty) return false;
+                  final due = DateTime.tryParse(dueStr)?.toLocal();
+                  if (due == null) return false;
+                  final dueDay = DateTime(due.year, due.month, due.day);
+                  return dueDay == today;
+                }).toList();
               }
             }
           } else if (_viewType == TaskViewType.starred) {
@@ -1007,6 +1021,8 @@ class _TasksPageState extends State<TasksPage> {
                           ? "Starred"
                           : _viewType == TaskViewType.archived
                           ? "Archived"
+                          : isDefaultList
+                          ? "Today"
                           : "Tasks",
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
@@ -1085,6 +1101,40 @@ class _TasksPageState extends State<TasksPage> {
                       activeList,
                       orderedPending.length,
                       completed.length,
+                    ),
+                  // "Today" empty state
+                  if (isDefaultList &&
+                      orderedPending.isEmpty &&
+                      completed.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 60),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.wb_sunny_outlined,
+                            size: 64,
+                            color: Colors.grey[300],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No tasks due today',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Enjoy your day or add a task with a due date set to today.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[400],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   // Reorderable pending tasks (long-press to drag)
                   ReorderableListView.builder(
