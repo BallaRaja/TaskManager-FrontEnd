@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../calendar_controller.dart';
-import '../../../tasks/presentation/widgets/task_item.dart';
+import 'calendar_task_tile.dart';
 
 class WeeklyView extends StatelessWidget {
   const WeeklyView({super.key});
@@ -209,10 +209,7 @@ class WeeklyView extends StatelessWidget {
             children: controller
                 .getInstancesForDate(controller.selectedDate)
                 .map((task) {
-                  return TaskItem(
-                    task: task,
-                    isCompleted: task["status"] == "completed",
-                  );
+                  return CalendarTaskTile(task: task);
                 })
                 .toList(),
           ),

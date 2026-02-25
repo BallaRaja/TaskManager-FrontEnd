@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../calendar_controller.dart';
-import '../../../tasks/presentation/widgets/task_item.dart';
+import 'calendar_task_tile.dart';
 
 class MonthlyView extends StatelessWidget {
   const MonthlyView({super.key});
@@ -278,10 +278,7 @@ class MonthlyView extends StatelessWidget {
                     final task = controller.getInstancesForDate(
                       controller.selectedDate,
                     )[index];
-                    return TaskItem(
-                      task: task,
-                      isCompleted: task["status"] == "completed",
-                    );
+                    return CalendarTaskTile(task: task);
                   },
                 ),
         ),
