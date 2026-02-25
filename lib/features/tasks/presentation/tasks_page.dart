@@ -6,6 +6,9 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
 import '../../profile/presentation/profile_sheet.dart';
+import '../../auth/presentation/login_page.dart';
+import '../../../core/utils/session_manager.dart';
+import 'summary_page.dart';
 import 'tasks_controller.dart';
 import 'task_view_type.dart';
 import 'widgets/task_list_tab.dart';
@@ -401,16 +404,6 @@ class _TasksPageState extends State<TasksPage> {
                   ),
                   _panelTile(
                     ctx,
-                    Icons.list_alt_rounded,
-                    'All Tasks',
-                    () {
-                      Navigator.pop(ctx);
-                      setState(() => _viewType = TaskViewType.normal);
-                    },
-                    _viewType == TaskViewType.normal,
-                  ),
-                  _panelTile(
-                    ctx,
                     Icons.star_rounded,
                     'Starred',
                     () {
@@ -429,9 +422,19 @@ class _TasksPageState extends State<TasksPage> {
                     },
                     _viewType == TaskViewType.archived,
                   ),
-                  // ── MY LISTS section ──
-                  if (controller.taskLists.isNotEmpty)
-                    ..._buildSidePanelLists(ctx, controller),
+                  _panelTile(ctx, Icons.person_outline_rounded, 'Profile', () {
+                    Navigator.pop(ctx);
+                    _showProfileSheet(context);
+                  }, false),
+                  _panelTile(ctx, Icons.bar_chart_rounded, 'Summary', () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SummaryPage()),
+                    );
+                  }, false),
+                  // ── MY LISTS + Logout section ──
+                  ..._buildSidePanelLists(ctx, controller),
                 ],
               ),
             ),
@@ -485,80 +488,134 @@ class _TasksPageState extends State<TasksPage> {
         ),
       ),
       Expanded(
-        child: ListView.builder(
-          padding: const EdgeInsets.only(bottom: 24),
-          itemCount: controller.taskLists.length,
-          itemBuilder: (_, i) {
-            final list = controller.taskLists[i];
-            final String listTitle = list['title']?.toString() ?? 'Untitled';
-            final String listId = list['_id']?.toString() ?? '';
-            final int taskCount = controller.tasks
-                .where(
-                  (t) =>
-                      t['taskListId']?.toString() == listId &&
-                      t['status'] != 'completed',
-                )
-                .length;
-            final bool isDefault = list['isDefault'] == true;
-            final bool isSelected =
-                _viewType == TaskViewType.normal &&
-                i == controller.selectedListIndex;
+        child: ClipRect(
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  clipBehavior: Clip.hardEdge,
+                  padding: const EdgeInsets.only(bottom: 8),
+                  itemCount: controller.taskLists.length,
+                  itemBuilder: (_, i) {
+                    final list = controller.taskLists[i];
+                    final String listTitle =
+                        list['title']?.toString() ?? 'Untitled';
+                    final String listId = list['_id']?.toString() ?? '';
+                    final int taskCount = controller.tasks
+                        .where(
+                          (t) =>
+                              t['taskListId']?.toString() == listId &&
+                              t['status'] != 'completed',
+                        )
+                        .length;
+                    final bool isDefault = list['isDefault'] == true;
+                    final bool isSelected =
+                        _viewType == TaskViewType.normal &&
+                        i == controller.selectedListIndex;
 
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-              child: ListTile(
-                leading: Icon(
-                  isDefault ? Icons.inbox_rounded : Icons.list_alt_rounded,
-                  color: isSelected ? Colors.purple : Colors.grey[600],
-                  size: 22,
-                ),
-                title: Text(
-                  listTitle,
-                  style: TextStyle(
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                    color: isSelected ? Colors.purple : null,
-                  ),
-                ),
-                trailing: taskCount > 0
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 2,
+                      ),
+                      child: ListTile(
+                        leading: Icon(
+                          isDefault
+                              ? Icons.inbox_rounded
+                              : Icons.list_alt_rounded,
+                          color: isSelected ? Colors.purple : Colors.grey[600],
+                          size: 22,
                         ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? Colors.purple
-                              : Colors.grey.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '$taskCount',
+                        title: Text(
+                          listTitle,
                           style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: isSelected ? Colors.white : Colors.grey[700],
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                            color: isSelected ? Colors.purple : null,
                           ),
                         ),
-                      )
-                    : null,
-                tileColor: isSelected ? Colors.purple.withOpacity(0.08) : null,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                        trailing: taskCount > 0
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? Colors.purple
+                                      : Colors.grey.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  '$taskCount',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.grey[700],
+                                  ),
+                                ),
+                              )
+                            : null,
+                        tileColor: isSelected
+                            ? Colors.purple.withOpacity(0.08)
+                            : null,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 2,
+                        ),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          setState(() {
+                            _viewType = TaskViewType.normal;
+                          });
+                          controller.selectList(i);
+                        },
+                      ),
+                    );
+                  },
                 ),
+              ),
+              const Divider(height: 1),
+              ListTile(
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 2,
                 ),
-                onTap: () {
+                leading: const Icon(Icons.logout_rounded, color: Colors.red),
+                title: const Text(
+                  'Logout',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                onTap: () async {
                   Navigator.pop(ctx);
-                  setState(() {
-                    _viewType = TaskViewType.normal;
-                  });
-                  controller.selectList(i);
+                  await SessionManager.clearSession();
+                  if (context.mounted) {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            LoginPage(onThemeChanged: widget.onThemeChanged),
+                      ),
+                      (route) => false,
+                    );
+                  }
                 },
               ),
-            );
-          },
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     ];
