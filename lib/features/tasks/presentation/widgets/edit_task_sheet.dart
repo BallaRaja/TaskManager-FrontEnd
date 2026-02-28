@@ -1,25 +1,33 @@
 // lib/features/tasks/presentation/widgets/edit_task_sheet.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../tasks_controller.dart';
+import 'package:client/features/tasks/presentation/tasks_controller.dart';
+import 'package:client/features/calendar/presentation/calendar_controller.dart';
 
 void showEditTaskSheet(BuildContext context, Map<String, dynamic> task) {
-  final controller = Provider.of<TasksController>(context, listen: false);
+  final tasksController = Provider.of<TasksController>(context, listen: false);
+  final calendarController = Provider.of<CalendarController>(context, listen: false);
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => EditTaskSheet(controller: controller, task: task),
+    builder: (_) => EditTaskSheet(
+      tasksController: tasksController,
+      calendarController: calendarController,
+      task: task,
+    ),
   );
 }
 
 class EditTaskSheet extends StatefulWidget {
-  final TasksController controller;
+  final TasksController tasksController;
+  final CalendarController calendarController;
   final Map<String, dynamic> task;
 
   const EditTaskSheet({
     super.key,
-    required this.controller,
+    required this.tasksController,
+    required this.calendarController,
     required this.task,
   });
 
@@ -506,10 +514,11 @@ class _EditTaskSheetState extends State<EditTaskSheet> {
     };
 
     final taskId = widget.task['_id'].toString();
-    final updated = await widget.controller.updateTask(taskId, body);
+    final updated = await widget.tasksController.updateTask(taskId, body);
 
     if (!mounted) return;
     if (updated != null) {
+      widget.calendarController.upsertTaskLocal(updated);
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Task updated!')));

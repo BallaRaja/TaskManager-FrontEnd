@@ -1,7 +1,9 @@
 import 'package:client/features/auth/presentation/login_page.dart';
+import 'package:client/features/auth/presentation/otp_verification_page.dart';
 import 'package:flutter/material.dart';
 import '../logic/auth_controller.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/validators.dart';
 
 // Custom wave clipper for the top section
 class _WaveClipper extends CustomClipper<Path> {
@@ -56,6 +58,19 @@ class _RegisterPageState extends State<RegisterPage> {
   bool loading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  PasswordValidationResult _passResult = Validators.checkPasswordStrength("");
+
+  @override
+  void initState() {
+    super.initState();
+    passwordController.addListener(_onPasswordChanged);
+  }
+
+  void _onPasswordChanged() {
+    setState(() {
+      _passResult = Validators.checkPasswordStrength(passwordController.text);
+    });
+  }
 
   Future<void> _showErrorPopup(String message) async {
     if (!mounted) return;
@@ -92,6 +107,11 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
+    if (!_passResult.isValid) {
+      await _showErrorPopup("Please meet all password strength requirements");
+      return;
+    }
+
     if (password != confirmPassword) {
       await _showErrorPopup("Password and confirm password do not match");
       return;
@@ -108,14 +128,17 @@ class _RegisterPageState extends State<RegisterPage> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("Registration successful. Please login."),
+            content: Text("Registration successful. Please verify your email."),
           ),
         );
 
-        Navigator.pushReplacement(
+        Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => LoginPage(onThemeChanged: widget.onThemeChanged),
+            builder: (_) => OTPVerificationPage(
+              email: email,
+              onThemeChanged: widget.onThemeChanged,
+            ),
           ),
         );
       } else {
@@ -134,11 +157,35 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   void dispose() {
+    passwordController.removeListener(_onPasswordChanged);
     nameController.dispose();
     emailController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Widget _buildRequirement(String label, bool met) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Icon(
+            met ? Icons.check_circle : Icons.circle_outlined,
+            size: 14,
+            color: met ? Colors.green : Colors.grey,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: met ? Colors.green : Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -160,6 +207,11 @@ class _RegisterPageState extends State<RegisterPage> {
     final headerEndColor = isDark
         ? const Color(0xFF1E1A2B)
         : const Color(0xFF4D5FDE);
+
+    Color strengthColor = Colors.red;
+    if (_passResult.strength > 0.4) strengthColor = Colors.orange;
+    if (_passResult.strength > 0.7) strengthColor = Colors.blue;
+    if (_passResult.isValid) strengthColor = Colors.green;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -328,6 +380,30 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  // Strength Meter
+                  if (passwordController.text.isNotEmpty) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: LinearProgressIndicator(
+                        value: _passResult.strength,
+                        backgroundColor: Colors.grey[200],
+                        valueColor: AlwaysStoppedAnimation<Color>(strengthColor),
+                        minHeight: 4,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 16,
+                      children: [
+                        _buildRequirement("8+ chars", _passResult.hasMinLength),
+                        _buildRequirement("Uppercase", _passResult.hasUppercase),
+                        _buildRequirement("Lowercase", _passResult.hasLowercase),
+                        _buildRequirement("Number", _passResult.hasDigit),
+                        _buildRequirement("Special", _passResult.hasSpecialChar),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 24),
 
                   // Confirm Password Field

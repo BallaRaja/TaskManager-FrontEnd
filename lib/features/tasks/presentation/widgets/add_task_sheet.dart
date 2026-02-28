@@ -1,12 +1,14 @@
 // lib/features/tasks/presentation/widgets/add_task_sheet.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../tasks_controller.dart';
+import 'package:client/features/tasks/presentation/tasks_controller.dart';
+import 'package:client/features/calendar/presentation/calendar_controller.dart';
 
 void showAddTaskSheet(BuildContext context) {
-  final controller = Provider.of<TasksController>(context, listen: false);
+  final tasksController = Provider.of<TasksController>(context, listen: false);
+  final calendarController = Provider.of<CalendarController>(context, listen: false);
 
-  if (controller.taskLists.isEmpty) {
+  if (tasksController.taskLists.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text("No task list found. Please create one first."),
@@ -17,24 +19,30 @@ void showAddTaskSheet(BuildContext context) {
 
   // Use the currently selected task list
   final String currentTaskListId =
-      controller.taskLists[controller.selectedListIndex]["_id"] as String;
+      tasksController.taskLists[tasksController.selectedListIndex]["_id"] as String;
 
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (_) =>
-        AddTaskSheet(controller: controller, taskListId: currentTaskListId),
+        AddTaskSheet(
+          tasksController: tasksController,
+          calendarController: calendarController,
+          taskListId: currentTaskListId,
+        ),
   );
 }
 
 class AddTaskSheet extends StatefulWidget {
-  final TasksController controller;
+  final TasksController tasksController;
+  final CalendarController calendarController;
   final String taskListId; // The ID of the list to add the task to
 
   const AddTaskSheet({
     super.key,
-    required this.controller,
+    required this.tasksController,
+    required this.calendarController,
     required this.taskListId,
   });
 
@@ -509,12 +517,19 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     print("📤 Saving task: $body");
 
     try {
-      await widget.controller.createTask(body);
+      final createdTask = await widget.tasksController.createTask(body);
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Task created!")));
-        Navigator.pop(context);
+        if (createdTask != null) {
+          widget.calendarController.upsertTaskLocal(createdTask);
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text("Task created!")));
+          Navigator.pop(context);
+        } else {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text("Failed to create task")));
+        }
       }
     } catch (e) {
       ScaffoldMessenger.of(

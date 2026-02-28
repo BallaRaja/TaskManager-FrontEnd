@@ -5,11 +5,14 @@ import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/session_manager.dart';
 import 'core/services/notification_service.dart'; // ← Notification Service
-import 'features/auth/data/auth_api.dart';
-import 'features/auth/presentation/login_page.dart';
-import 'features/tasks/presentation/tasks_page.dart';
-import 'features/ai/presentation/ai_chat_page.dart';
-import 'features/calendar/presentation/calendar_page.dart';
+import 'package:client/features/auth/data/auth_api.dart';
+import 'package:client/features/auth/presentation/login_page.dart';
+import 'package:client/features/tasks/presentation/tasks_page.dart';
+import 'package:client/features/tasks/presentation/tasks_controller.dart';
+import 'package:client/features/calendar/presentation/calendar_page.dart';
+import 'package:client/features/calendar/presentation/calendar_controller.dart';
+import 'package:client/features/ai/presentation/ai_chat_page.dart';
+import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -200,21 +203,30 @@ class _MainAppShellState extends State<MainAppShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: _pages[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        selectedItemColor: Theme.of(context).primaryColor,
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.checklist), label: 'Tasks'),
-          BottomNavigationBarItem(icon: Icon(Icons.auto_awesome), label: 'AI'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_today),
-            label: 'Calendar',
-          ),
-        ],
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => TasksController()..init()),
+        ChangeNotifierProvider(create: (_) => CalendarController()..init()),
+      ],
+      child: Scaffold(
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: _pages,
+        ),
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: _onItemTapped,
+          selectedItemColor: Theme.of(context).primaryColor,
+          unselectedItemColor: Colors.grey,
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.checklist), label: 'Tasks'),
+            BottomNavigationBarItem(icon: Icon(Icons.auto_awesome), label: 'AI'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_today),
+              label: 'Calendar',
+            ),
+          ],
+        ),
       ),
     );
   }

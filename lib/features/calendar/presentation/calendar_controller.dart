@@ -8,7 +8,11 @@ import '../../../core/utils/session_manager.dart';
 class CalendarController extends ChangeNotifier {
   List<Map<String, dynamic>> _tasks = [];
   bool _isLoading = true;
-  DateTime selectedDate = DateTime.now();
+  DateTime selectedDate = DateTime(
+    DateTime.now().year,
+    DateTime.now().month,
+    DateTime.now().day,
+  );
   String? _userId;
   String? _token;
 
@@ -27,7 +31,11 @@ class CalendarController extends ChangeNotifier {
   Future<void> init() async {
     _token = await SessionManager.getToken();
     _userId = await SessionManager.getUserId();
-    if (_token == null || _userId == null) return;
+    if (_token == null || _userId == null) {
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
 
     await Future.wait([
       _fetchTasks(),
@@ -79,7 +87,7 @@ class CalendarController extends ChangeNotifier {
   Future<void> _fetchTasks() async {
     try {
       final response = await http.get(
-        Uri.parse("${ApiConstants.backendUrl}/api/task/$_userId"),
+        Uri.parse("${ApiConstants.backendUrl}/api/task"), // Use private endpoint for sync
         headers: {"Authorization": "Bearer $_token"},
       );
       if (response.statusCode == 200) {
@@ -125,9 +133,9 @@ class CalendarController extends ChangeNotifier {
         },
         body: jsonEncode({
           'status': newStatus,
-          if (newStatus == 'completed')
-            'completedAt': DateTime.now().toIso8601String(),
-          if (newStatus == 'pending') 'completedAt': null,
+          'completedAt': newStatus == 'completed' 
+              ? DateTime.now().toUtc().toIso8601String() 
+              : null,
         }),
       );
       if (response.statusCode == 200) {
@@ -136,17 +144,39 @@ class CalendarController extends ChangeNotifier {
         if (idx != -1) {
           _tasks[idx] = Map<String, dynamic>.from(_tasks[idx]);
           _tasks[idx]['status'] = newStatus;
+          _tasks[idx]['completedAt'] = newStatus == 'completed' 
+              ? DateTime.now().toUtc().toIso8601String() 
+              : null;
         }
         notifyListeners();
         return true;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint("Toggle error: $e");
+    }
     return false;
   }
 
   // Public method to refresh avatar only
   Future<void> refreshAvatar() async {
     await _fetchProfileAvatar();
+  }
+
+  void upsertTaskLocal(Map<String, dynamic> task) {
+    final taskId = task['_id']?.toString();
+    if (taskId == null) return;
+    final idx = _tasks.indexWhere((t) => t['_id']?.toString() == taskId);
+    if (idx != -1) {
+      _tasks[idx] = Map<String, dynamic>.from(task);
+    } else {
+      _tasks.add(Map<String, dynamic>.from(task));
+    }
+    notifyListeners();
+  }
+
+  void removeTaskLocal(String taskId) {
+    _tasks.removeWhere((t) => t['_id']?.toString() == taskId);
+    notifyListeners();
   }
 
   // Recurrence Logic (unchanged)

@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../../../../core/constants/api_constants.dart';
-import '../../../../core/utils/session_manager.dart';
-import '../tasks_controller.dart';
-import 'edit_task_sheet.dart';
+import 'package:client/core/constants/api_constants.dart';
+import 'package:client/core/utils/session_manager.dart';
+import 'package:client/features/tasks/presentation/tasks_controller.dart';
+import 'package:client/features/tasks/presentation/widgets/edit_task_sheet.dart';
+
+import 'package:client/features/calendar/presentation/calendar_controller.dart';
 
 class TaskItem extends StatelessWidget {
   final Map<String, dynamic> task;
@@ -35,63 +37,51 @@ class TaskItem extends StatelessWidget {
     BuildContext context,
     Map<String, dynamic> updatedTask,
   ) {
-    final controller = Provider.of<TasksController>(context, listen: false);
-    controller.upsertTaskLocal(updatedTask);
+    final tasksCtrl = Provider.of<TasksController>(context, listen: false);
+    final calendarCtrl = Provider.of<CalendarController>(context, listen: false);
+    tasksCtrl.upsertTaskLocal(updatedTask);
+    calendarCtrl.upsertTaskLocal(updatedTask);
   }
 
   void _removeLocalTask(BuildContext context) {
-    final controller = Provider.of<TasksController>(context, listen: false);
-    controller.removeTaskLocal(task["_id"].toString());
+    final tasksCtrl = Provider.of<TasksController>(context, listen: false);
+    final calendarCtrl = Provider.of<CalendarController>(context, listen: false);
+    final taskId = task["_id"].toString();
+    tasksCtrl.removeTaskLocal(taskId);
+    calendarCtrl.removeTaskLocal(taskId);
   }
 
   Future<void> _toggleComplete(BuildContext context) async {
-    final token = await SessionManager.getToken();
-    if (token == null) return;
+    final controller = Provider.of<TasksController>(context, listen: false);
     final newStatus = isCompleted ? "pending" : "completed";
     final taskId = task["_id"].toString();
 
-    // Optimistic update — immediately reflect the change in UI
+    // Optimistic update
     final optimisticTask = Map<String, dynamic>.from(task);
     optimisticTask["status"] = newStatus;
-    if (!isCompleted) {
-      optimisticTask["completedAt"] = DateTime.now().toIso8601String();
-    } else {
-      optimisticTask["completedAt"] = null;
-    }
-    if (context.mounted) _updateLocalTask(context, optimisticTask);
+    optimisticTask["completedAt"] =
+        newStatus == "completed" ? DateTime.now().toIso8601String() : null;
+    
+    _updateLocalTask(context, optimisticTask);
 
     try {
-      final response = await http.put(
-        Uri.parse("${ApiConstants.backendUrl}/api/task/$taskId"),
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $token",
-        },
-        body: jsonEncode({
-          "status": newStatus,
-          if (!isCompleted) "completedAt": DateTime.now().toIso8601String(),
-          if (isCompleted) "completedAt": null,
-        }),
-      );
-      if (response.statusCode == 200) {
-        final updatedTask = jsonDecode(response.body)["data"];
-        if (context.mounted) _updateLocalTask(context, updatedTask);
-      } else {
-        // Revert optimistic update on server error
-        if (context.mounted) _updateLocalTask(context, task);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Failed to update task")),
-          );
-        }
+      final success = await controller.updateTask(taskId, {
+        "status": newStatus,
+        "completedAt": optimisticTask["completedAt"],
+      });
+      if (success == null && context.mounted) {
+        // Revert on failure
+        _updateLocalTask(context, task);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to update task")),
+        );
       }
     } catch (e) {
-      // Revert optimistic update on network error
-      if (context.mounted) _updateLocalTask(context, task);
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Failed to update task")));
+        _updateLocalTask(context, task);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Network error")),
+        );
       }
     }
   }
@@ -153,31 +143,26 @@ class TaskItem extends StatelessWidget {
   }
 
   Future<void> _deleteTask(BuildContext context) async {
-    final token = await SessionManager.getToken();
-    if (token == null) return;
+    final tasksCtrl = Provider.of<TasksController>(context, listen: false);
+    final calendarCtrl = Provider.of<CalendarController>(context, listen: false);
     final taskId = task["_id"].toString();
     try {
-      final response = await http.delete(
-        Uri.parse("${ApiConstants.backendUrl}/api/task/$taskId"),
-        headers: {"Authorization": "Bearer $token"},
-      );
-      if (response.statusCode == 200) {
-        _removeLocalTask(context);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Task deleted"),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
+      await tasksCtrl.deleteTask(taskId);
+      calendarCtrl.removeTaskLocal(taskId);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Task deleted"),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Failed to delete")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to delete")),
+        );
       }
     }
   }

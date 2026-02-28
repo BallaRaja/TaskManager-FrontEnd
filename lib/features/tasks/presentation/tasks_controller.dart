@@ -201,9 +201,9 @@ class TasksController extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> createTask(Map<String, dynamic> taskData) async {
+  Future<Map<String, dynamic>?> createTask(Map<String, dynamic> taskData) async {
     _token ??= await SessionManager.getToken();
-    if (_token == null) return;
+    if (_token == null) return null;
 
     try {
       final response = await http.post(
@@ -216,9 +216,15 @@ class TasksController extends ChangeNotifier {
       );
 
       if (response.statusCode == 201) {
-        await _fetchTasks();
+        final Map<String, dynamic> json = jsonDecode(response.body);
+        final created = json['data'] as Map<String, dynamic>?;
+        if (created != null) {
+          upsertTaskLocal(created);
+          return created;
+        }
       }
     } catch (_) {}
+    return null;
   }
 
   Future<Map<String, dynamic>?> updateTask(
@@ -246,6 +252,23 @@ class TasksController extends ChangeNotifier {
       }
     } catch (_) {}
     return null;
+  }
+
+  Future<void> deleteTask(String taskId) async {
+    _token ??= await SessionManager.getToken();
+    if (_token == null) return;
+
+    try {
+      final response = await http.delete(
+        Uri.parse('${ApiConstants.backendUrl}/api/task/$taskId'),
+        headers: {'Authorization': 'Bearer $_token'},
+      );
+
+      if (response.statusCode == 200) {
+        _tasks.removeWhere((t) => t['_id']?.toString() == taskId);
+        notifyListeners();
+      }
+    } catch (_) {}
   }
 
   void upsertTaskLocal(Map<String, dynamic> updatedTask) {

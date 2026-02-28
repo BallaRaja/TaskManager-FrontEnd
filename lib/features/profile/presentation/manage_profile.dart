@@ -10,6 +10,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:client/core/constants/api_constants.dart';
 import '../../../core/utils/session_manager.dart';
 import 'avatar_crop_page.dart';
+import 'package:client/features/auth/data/auth_api.dart';
 
 class ManageProfilePage extends StatefulWidget {
   final Map<String, dynamic> profileData;
@@ -96,6 +97,28 @@ class _ManageProfilePageState extends State<ManageProfilePage> {
       );
 
       if (pickedFile == null || !mounted) return;
+
+      // Validate file size (max 5MB)
+      final file = File(pickedFile.path);
+      final sizeInBytes = await file.length();
+      if (sizeInBytes > 5 * 1024 * 1024) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Image size too large. Max 5MB allowed.")),
+        );
+        return;
+      }
+
+      // Validate file type
+      final ext = pickedFile.path.split('.').last.toLowerCase();
+      final allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+      if (!allowedExtensions.contains(ext)) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Invalid file type (.$ext). Only JPG, PNG, GIF, WebP allowed.")),
+        );
+        return;
+      }
 
       // ── Instagram-like crop/zoom screen ──────────────────────────────
       final File? croppedFile = await Navigator.push<File>(
@@ -1062,10 +1085,80 @@ class _ManageProfilePageState extends State<ManageProfilePage> {
                           ),
                         ),
 
-                        const SizedBox(height: 32),
-                      ],
-                    ),
-                  ),
+                        const SizedBox(height: 28),
+ 
+                         // Section label
+                         Padding(
+                           padding: const EdgeInsets.only(left: 4, bottom: 12),
+                           child: Text(
+                             'SECURITY',
+                             style: TextStyle(
+                               fontSize: 11,
+                               fontWeight: FontWeight.w700,
+                               letterSpacing: 1.4,
+                               color: Colors.purple.shade400,
+                             ),
+                           ),
+                         ),
+ 
+                         // ── Change Password Button ────────────────────────
+                         Container(
+                           width: double.infinity,
+                           decoration: BoxDecoration(
+                             color: cardColor,
+                             borderRadius: BorderRadius.circular(18),
+                             boxShadow: [
+                               BoxShadow(
+                                 color: isDark
+                                     ? Colors.black.withOpacity(0.3)
+                                     : Colors.purple.withOpacity(0.07),
+                                 blurRadius: 16,
+                                 offset: const Offset(0, 4),
+                               ),
+                             ],
+                           ),
+                           child: ListTile(
+                             onTap: _showChangePasswordDialog,
+                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                             leading: Container(
+                               width: 40,
+                               height: 40,
+                               decoration: BoxDecoration(
+                                 color: Colors.purple.withOpacity(0.1),
+                                 borderRadius: BorderRadius.circular(10),
+                               ),
+                               child: Icon(
+                                 Icons.lock_outline_rounded,
+                                 color: Colors.purple.shade400,
+                                 size: 20,
+                               ),
+                             ),
+                             title: Text(
+                               'Change Password',
+                               style: TextStyle(
+                                 fontSize: 15,
+                                 fontWeight: FontWeight.w600,
+                                 color: isDark ? Colors.white : Colors.black87,
+                               ),
+                             ),
+                             subtitle: Text(
+                               'Update your login credentials',
+                               style: TextStyle(
+                                 fontSize: 12,
+                                 color: isDark ? Colors.white54 : Colors.black54,
+                               ),
+                             ),
+                             trailing: Icon(
+                               Icons.chevron_right_rounded,
+                               color: isDark ? Colors.grey[600] : Colors.grey[400],
+                             ),
+                           ),
+                         ),
+ 
+                         const SizedBox(height: 32),
+                       ],
+                     ),
+                   ),
                 ],
               ),
             ),
@@ -1158,6 +1251,112 @@ class _ManageProfilePageState extends State<ManageProfilePage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showChangePasswordDialog() {
+    final oldPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    bool isChanging = false;
+    bool _obscureOld = true;
+    bool _obscureNew = true;
+    bool _obscureConfirm = true;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text("Change Password"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: oldPasswordController,
+                obscureText: _obscureOld,
+                decoration: InputDecoration(
+                  labelText: "Old Password",
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureOld ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setDialogState(() => _obscureOld = !_obscureOld),
+                  ),
+                ),
+              ),
+              TextField(
+                controller: newPasswordController,
+                obscureText: _obscureNew,
+                decoration: InputDecoration(
+                  labelText: "New Password",
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureNew ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setDialogState(() => _obscureNew = !_obscureNew),
+                  ),
+                ),
+              ),
+              TextField(
+                controller: confirmPasswordController,
+                obscureText: _obscureConfirm,
+                decoration: InputDecoration(
+                  labelText: "Confirm New Password",
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setDialogState(() => _obscureConfirm = !_obscureConfirm),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: isChanging ? null : () async {
+                final oldPass = oldPasswordController.text;
+                final newPass = newPasswordController.text;
+                final confirmPass = confirmPasswordController.text;
+
+                if (oldPass.isEmpty || newPass.isEmpty || confirmPass.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("All fields are required")),
+                  );
+                  return;
+                }
+
+                if (newPass != confirmPass) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("New passwords do not match")),
+                  );
+                  return;
+                }
+
+                setDialogState(() => isChanging = true);
+                try {
+                  final token = await SessionManager.getToken();
+                  if (token == null) throw Exception("Session expired");
+
+                  final success = await AuthApi.changePassword(token, oldPass, newPass);
+                  if (success) {
+                    if (!mounted) return;
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Password updated successfully")),
+                    );
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(e.toString().replaceFirst("Exception: ", ""))),
+                  );
+                } finally {
+                  setDialogState(() => isChanging = false);
+                }
+              },
+              child: isChanging ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text("Update"),
+            ),
+          ],
+        ),
       ),
     );
   }
