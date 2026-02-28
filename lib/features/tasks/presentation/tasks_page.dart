@@ -5,14 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
-import '../../profile/presentation/profile_sheet.dart';
-import '../../auth/presentation/login_page.dart';
-import '../../../core/utils/session_manager.dart';
-import 'summary_page.dart';
-import 'tasks_controller.dart';
-import 'task_view_type.dart';
-import 'widgets/task_list_tab.dart';
-import 'widgets/task_item.dart';
+import 'package:client/features/profile/presentation/profile_sheet.dart';
+import 'package:client/features/auth/presentation/login_page.dart';
+import 'package:client/core/utils/session_manager.dart';
+import 'package:client/features/tasks/presentation/summary_page.dart';
+import 'package:client/features/tasks/presentation/tasks_controller.dart';
+import 'package:client/features/tasks/presentation/task_view_type.dart';
+import 'package:client/features/tasks/presentation/widgets/task_list_tab.dart';
+import 'package:client/features/tasks/presentation/widgets/task_item.dart';
 import 'widgets/completed_section.dart';
 
 class TasksPage extends StatefulWidget {
@@ -924,17 +924,14 @@ class _TasksPageState extends State<TasksPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => TasksController()..init(),
-      child: Consumer<TasksController>(
-        builder: (context, controller, _) {
-          if (controller.isLoading) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
+    final controller = context.watch<TasksController>();
+    if (controller.isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
-          // === FILTERING LOGIC ===
+    // === FILTERING LOGIC ===
           List<Map<String, dynamic>> displayedTasks = controller.tasks;
           Map<String, dynamic>? activeList; // non-null only for custom lists
           String? currentListId;
@@ -1183,9 +1180,6 @@ class _TasksPageState extends State<TasksPage> {
                   )
                 : null,
           );
-        },
-      ),
-    );
   }
 
   // ─────────────────────────────────────────────────────────

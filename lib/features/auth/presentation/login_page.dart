@@ -1,3 +1,4 @@
+import 'package:client/features/auth/presentation/forgot_password_page.dart';
 import 'package:flutter/material.dart';
 import '../logic/auth_controller.dart';
 import 'register_page.dart';
@@ -274,7 +275,14 @@ class _LoginPageState extends State<LoginPage> {
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () {
-                        // Handle forgot password
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ForgotPasswordPage(
+                              onThemeChanged: widget.onThemeChanged,
+                            ),
+                          ),
+                        );
                       },
                       style: TextButton.styleFrom(
                         padding: EdgeInsets.zero,

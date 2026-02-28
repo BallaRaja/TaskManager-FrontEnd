@@ -79,9 +79,6 @@ class AuthApi {
     String password,
   ) async {
     print("➡️ [AuthApi] REGISTER called");
-    print("👤 Name: $name");
-    print("📧 Email: $email");
-
     try {
       final res = await http.post(
         Uri.parse("${ApiConstants.baseUrl}/register"),
@@ -89,20 +86,81 @@ class AuthApi {
         body: jsonEncode({"name": name, "email": email, "password": password}),
       );
 
-      print("⬅️ [AuthApi] REGISTER response code: ${res.statusCode}");
-      print("📦 Response body: ${res.body}");
-
-      // ✅ ACCEPT 201 (Created)
-      if (res.statusCode == 201) {
-        return true;
-      }
+      if (res.statusCode == 201) return true;
 
       final data = jsonDecode(res.body);
-      throw Exception(
-        data["error"] ?? data["message"] ?? "Registration failed",
-      );
+      throw Exception(data["error"] ?? "Registration failed");
     } catch (e) {
-      print("❌ [AuthApi] REGISTER exception: $e");
+      throw Exception(e.toString().replaceFirst("Exception: ", ""));
+    }
+  }
+
+  /// 📧 Verify OTP
+  static Future<bool> verifyOtp(String email, String otp) async {
+    print("➡️ [AuthApi] verifyOtp called");
+    try {
+      final res = await http.post(
+        Uri.parse("${ApiConstants.baseUrl}/verify-otp"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"email": email, "otp": otp}),
+      );
+
+      if (res.statusCode == 200) return true;
+
+      final data = jsonDecode(res.body);
+      throw Exception(data["error"] ?? "Verification failed");
+    } catch (e) {
+      throw Exception(e.toString().replaceFirst("Exception: ", ""));
+    }
+  }
+
+  /// 🔑 Forgot Password
+  static Future<bool> forgotPassword(String email) async {
+    try {
+      final res = await http.post(
+        Uri.parse("${ApiConstants.baseUrl}/forgot-password"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"email": email}),
+      );
+      if (res.statusCode == 200) return true;
+      final data = jsonDecode(res.body);
+      throw Exception(data["error"] ?? "Forgot password request failed");
+    } catch (e) {
+      throw Exception(e.toString().replaceFirst("Exception: ", ""));
+    }
+  }
+
+  /// 🔑 Reset Password
+  static Future<bool> resetPassword(String email, String otp, String newPassword) async {
+    try {
+      final res = await http.post(
+        Uri.parse("${ApiConstants.baseUrl}/reset-password"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"email": email, "otp": otp, "newPassword": newPassword}),
+      );
+      if (res.statusCode == 200) return true;
+      final data = jsonDecode(res.body);
+      throw Exception(data["error"] ?? "Reset password failed");
+    } catch (e) {
+      throw Exception(e.toString().replaceFirst("Exception: ", ""));
+    }
+  }
+
+  /// 🔑 Change Password
+  static Future<bool> changePassword(String token, String oldPassword, String newPassword) async {
+    try {
+      final res = await http.post(
+        Uri.parse("${ApiConstants.baseUrl}/change-password"),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode({"oldPassword": oldPassword, "newPassword": newPassword}),
+      );
+      if (res.statusCode == 200) return true;
+      final data = jsonDecode(res.body);
+      throw Exception(data["error"] ?? "Change password failed");
+    } catch (e) {
       throw Exception(e.toString().replaceFirst("Exception: ", ""));
     }
   }

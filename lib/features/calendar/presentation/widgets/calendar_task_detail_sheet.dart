@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../calendar_controller.dart';
+import 'package:client/features/tasks/presentation/tasks_controller.dart';
 
 void showCalendarTaskDetail(BuildContext context, Map<String, dynamic> task) {
   showModalBottomSheet(
@@ -66,16 +67,53 @@ class _CalendarTaskDetailSheetState extends State<_CalendarTaskDetailSheet> {
   Future<void> _toggleComplete() async {
     if (_toggling) return;
     setState(() => _toggling = true);
-    final controller = Provider.of<CalendarController>(context, listen: false);
-    final success = await controller.toggleTaskComplete(_task);
-    if (success && mounted) {
-      setState(() {
-        _task['status'] = _task['status'] == 'completed'
-            ? 'pending'
-            : 'completed';
+    
+    final calController = Provider.of<CalendarController>(context, listen: false);
+    final tasksController = Provider.of<TasksController>(context, listen: false);
+    
+    final newStatus = _task['status'] == 'completed' ? 'pending' : 'completed';
+    final taskId = _task['_id'].toString();
+    
+    // Optimistic update
+    final updatedTask = Map<String, dynamic>.from(_task);
+    updatedTask['status'] = newStatus;
+    updatedTask['completedAt'] = newStatus == 'completed' 
+        ? DateTime.now().toUtc().toIso8601String() 
+        : null;
+
+    try {
+      final result = await tasksController.updateTask(taskId, {
+        "status": newStatus,
+        "completedAt": updatedTask['completedAt'],
       });
+      
+      if (result != null) {
+        // Sync both controllers
+        calController.upsertTaskLocal(result);
+        // TasksController.updateTask already updates its local list
+        
+        if (mounted) {
+          setState(() {
+            _task = Map<String, dynamic>.from(result);
+          });
+        }
+      } else {
+        // Revert or show error
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Failed to update task")),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Network error")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _toggling = false);
     }
-    if (mounted) setState(() => _toggling = false);
   }
 
   @override

@@ -198,17 +198,14 @@ class _CalendarPageState extends State<CalendarPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => CalendarController()..init(),
-      child: Consumer<CalendarController>(
-        builder: (context, controller, _) {
-          if (controller.isLoading) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
+    final controller = context.watch<CalendarController>();
+    if (controller.isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
-          return Scaffold(
+    return Scaffold(
             appBar: AppBar(
               backgroundColor: Colors.transparent,
               elevation: 0,
@@ -287,8 +284,5 @@ class _CalendarPageState extends State<CalendarPage> {
             ),
             // Removed FAB completely as requested
           );
-        },
-      ),
-    );
   }
 }
