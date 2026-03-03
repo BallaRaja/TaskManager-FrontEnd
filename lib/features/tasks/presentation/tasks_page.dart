@@ -950,11 +950,12 @@ class _TasksPageState extends State<TasksPage> {
                     )
                     .toList();
               } else {
-                // Default "My Tasks" list → show only tasks due today
+                // Default "My Tasks" list → show only tasks due today (exclude archived)
                 isDefaultList = true;
                 final now = DateTime.now();
                 final today = DateTime(now.year, now.month, now.day);
                 displayedTasks = controller.tasks.where((task) {
+                  if (task['isArchived'] == true) return false;
                   final dueStr = task['dueDate'] as String?;
                   if (dueStr == null || dueStr.isEmpty) return false;
                   final due = DateTime.tryParse(dueStr)?.toLocal();
