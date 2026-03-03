@@ -20,6 +20,81 @@ class MessageBubble extends StatelessWidget {
     this.userAvatarUrl,
   });
 
+  // ── Inline markdown parser ──────────────────────────────────────
+  // Handles **bold**, *italic*, lines starting with "- " (bullets),
+  // and plain newlines — no external package needed.
+  List<InlineSpan> _parseInline(String text) {
+    final spans = <InlineSpan>[];
+    final regex = RegExp(r'\*\*(.+?)\*\*|\*(.+?)\*');
+    int lastEnd = 0;
+
+    for (final match in regex.allMatches(text)) {
+      if (match.start > lastEnd) {
+        spans.add(TextSpan(text: text.substring(lastEnd, match.start)));
+      }
+      if (match.group(1) != null) {
+        spans.add(TextSpan(
+          text: match.group(1),
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ));
+      } else if (match.group(2) != null) {
+        spans.add(TextSpan(
+          text: match.group(2),
+          style: const TextStyle(fontStyle: FontStyle.italic),
+        ));
+      }
+      lastEnd = match.end;
+    }
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(text: text.substring(lastEnd)));
+    }
+    if (spans.isEmpty) spans.add(TextSpan(text: text));
+    return spans;
+  }
+
+  Widget _buildMarkdown(String content, Color textColor) {
+    final lines = content.split('\n');
+    final children = <InlineSpan>[];
+
+    for (int i = 0; i < lines.length; i++) {
+      if (i > 0) children.add(const TextSpan(text: '\n'));
+
+      final line = lines[i];
+      final trimmed = line.trimLeft();
+
+      // Horizontal rule
+      if (trimmed == '---' || trimmed == '***') {
+        children.add(const WidgetSpan(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 4),
+            child: Divider(height: 1),
+          ),
+        ));
+        continue;
+      }
+
+      // Bullet point
+      if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
+        final body = trimmed.startsWith('- ')
+            ? trimmed.substring(2)
+            : trimmed.substring(2);
+        children.add(const TextSpan(text: '• '));
+        children.addAll(_parseInline(body));
+        continue;
+      }
+
+      // Normal line
+      children.addAll(_parseInline(line));
+    }
+
+    return RichText(
+      text: TextSpan(
+        style: TextStyle(color: textColor, fontSize: 15, height: 1.45),
+        children: children,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isUser = message.role == MessageRole.user;
@@ -76,13 +151,16 @@ class MessageBubble extends StatelessWidget {
                           : const Radius.circular(18),
                     ),
                   ),
-                  child: Text(
-                    message.content,
-                    style: TextStyle(
-                      color: isUser ? Colors.white : assistantTextColor,
-                      fontSize: 15,
-                    ),
-                  ),
+                  child: isUser
+                      ? Text(
+                          message.content,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            height: 1.45,
+                          ),
+                        )
+                      : _buildMarkdown(message.content, assistantTextColor),
                 ),
               ),
 

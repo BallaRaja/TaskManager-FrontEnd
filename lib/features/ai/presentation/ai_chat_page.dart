@@ -306,33 +306,104 @@ class _AIChatPageState extends State<AIChatPage> {
   }
 
   Widget _buildInputBar(AIController aiController) {
-    return Padding(
-      padding: const EdgeInsets.all(12),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.07),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          // ── Text field ──────────────────────────────────────────
           Expanded(
-            child: TextField(
-              controller: _controller,
-              decoration: const InputDecoration(hintText: "Ask me anything..."),
-              onSubmitted: (v) {
-                if (v.trim().isNotEmpty) {
-                  aiController.sendMessage(v.trim());
-                  _controller.clear();
-                }
-              },
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF1E1A2B)
+                    : const Color(0xFFF3EEFF),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.purple.shade900
+                      : Colors.purple.shade100,
+                  width: 1.2,
+                ),
+              ),
+              child: TextField(
+                controller: _controller,
+                minLines: 1,
+                maxLines: 4,
+                style: TextStyle(
+                  color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                  fontSize: 15,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Ask me anything…',
+                  hintStyle: TextStyle(
+                    color: isDark ? Colors.white38 : Colors.grey.shade500,
+                    fontSize: 15,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
+                  ),
+                ),
+                onSubmitted: (v) {
+                  if (v.trim().isNotEmpty) {
+                    aiController.sendMessage(v.trim());
+                    _controller.clear();
+                  }
+                },
+              ),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.send),
-            onPressed: aiController.isLoading
-                ? null
-                : () {
-                    final text = _controller.text.trim();
-                    if (text.isNotEmpty) {
-                      aiController.sendMessage(text);
-                      _controller.clear();
-                    }
-                  },
+
+          const SizedBox(width: 8),
+
+          // ── Send button ─────────────────────────────────────────
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            decoration: BoxDecoration(
+              color: aiController.isLoading
+                  ? (isDark ? Colors.grey.shade700 : Colors.grey.shade300)
+                  : Colors.purple,
+              shape: BoxShape.circle,
+              boxShadow: aiController.isLoading
+                  ? []
+                  : [
+                      BoxShadow(
+                        color: Colors.purple.withOpacity(0.4),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+            ),
+            child: IconButton(
+              icon: Icon(
+                Icons.send_rounded,
+                color: aiController.isLoading ? Colors.grey : Colors.white,
+                size: 20,
+              ),
+              onPressed: aiController.isLoading
+                  ? null
+                  : () {
+                      final text = _controller.text.trim();
+                      if (text.isNotEmpty) {
+                        aiController.sendMessage(text);
+                        _controller.clear();
+                      }
+                    },
+            ),
           ),
         ],
       ),

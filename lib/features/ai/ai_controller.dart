@@ -272,37 +272,86 @@ class AIController extends ChangeNotifier {
       final taskContext = await _fetchTaskContext();
 
       final istNow = nowIST();
-      final istNowStr = istNow.toIso8601String();
+      final istNowStr = DateFormat("EEE, d MMM yyyy 'at' h:mm a").format(istNow);
+      final tomorrowStr = DateFormat("EEE, d MMM yyyy").format(
+        istNow.add(const Duration(days: 1)),
+      );
 
       final uri = Uri.parse(
         "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=$apiKey",
       );
 
+      // Build conversation history for multi-turn context
+      // The first turn is always the system context as a user message,
+      // then alternate user/assistant turns from history.
+      final List<Map<String, dynamic>> contents = [
+        {
+          "role": "user",
+          "parts": [
+            {
+              "text":
+                  "You are a helpful task management AI assistant for Indian users.\n\n"
+                  "CURRENT IST DATE & TIME: $istNowStr (UTC+05:30)\n"
+                  "TOMORROW IS: $tomorrowStr\n\n"
+                  "TIME RULES:\n"
+                  "- morning = 5:00 AM – 11:59 AM\n"
+                  "- afternoon = 12:00 PM – 4:59 PM\n"
+                  "- evening = 5:00 PM – 8:59 PM\n"
+                  "- night = 9:00 PM – 11:59 PM\n\n"
+                  "USER'S TASKS (always answer questions using this data):\n"
+                  "$taskContext\n\n"
+                  "STRICT RULES — READ CAREFULLY:\n"
+                  "1. When asked about tasks on a specific day, filter and list ONLY those tasks.\n"
+                  "2. Be concise and friendly.\n"
+                  "3. ⚠️ TASK CREATION — MANDATORY FORMAT:\n"
+                  "   If the user wants to ADD or CREATE a task, you MUST respond with EXACTLY this "
+                  "format and NOTHING else — no explanation, no extra text:\n"
+                  "   ADD_TASK:{title}|{dueDateISO}|{priority}|{notes}|{repeat}\n"
+                  "   Example: ADD_TASK:Buy milk|2026-03-04T09:00:00|medium||null\n"
+                  "   Priority must be: low, medium, or high.\n"
+                  "   dueDateISO must be in IST (UTC+05:30) in ISO 8601 format.\n"
+                  "   Leave notes/repeat empty if not mentioned.\n"
+                  "4. For all other queries (listing, counting, advice), reply in plain friendly text.",
+            },
+          ],
+        },
+        // ── synthetic model ack ──
+        {
+          "role": "model",
+          "parts": [
+            {"text": "Understood! I'll use ADD_TASK format strictly for task creation."},
+          ],
+        },
+      ];
+
+      // Append previous real conversation turns.
+      // ⚠️ Skip internal UI-generated messages (the "I can add this task…" /
+      //    "Tap below to confirm" ones) because they confuse Gemini into
+      //    mimicking that format instead of using ADD_TASK:.
+      final history = messages.length > 1
+          ? messages.sublist(0, messages.length - 1) // exclude just-added user msg
+          : <ChatMessage>[];
+      for (final msg in history) {
+        final isInternalConfirm = msg.role == MessageRole.assistant &&
+            (msg.content.contains("Tap below to confirm") ||
+             msg.content.contains("I can add this task") ||
+             msg.content.contains("I understood this as a task"));
+        if (isInternalConfirm) continue; // don't send UI-only messages to Gemini
+        contents.add({
+          "role": msg.role == MessageRole.user ? "user" : "model",
+          "parts": [{"text": msg.content}],
+        });
+      }
+
+      // Finally, the current user message
+      contents.add({
+        "role": "user",
+        "parts": [{"text": userInput}],
+      });
+
       final requestBody = {
-        "contents": [
-          {
-            "role": "user",
-            "parts": [
-              {
-                "text":
-                    "You are a task management AI for Indian users.\n\n"
-                    "CURRENT IST DATE & TIME (AUTHORITATIVE):\n"
-                    "$istNowStr (UTC+05:30)\n\n"
-                    "TIME RULES:\n"
-                    "- morning = 5:00 AM – 11:59 AM\n"
-                    "- afternoon = 12:00 PM – 4:59 PM\n"
-                    "- evening = 5:00 PM – 8:59 PM\n"
-                    "- night = 9:00 PM – 11:59 PM\n\n"
-                    "CURRENT TASK CONTEXT:\n"
-                    "$taskContext\n\n"
-                    "FORMAT FOR ADDING TASK:\n"
-                    "ADD_TASK:{title}|{dueDateISO}|{priority}|{notes}|{repeat}\n\n"
-                    "User message: $userInput",
-              },
-            ],
-          },
-        ],
-        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 512},
+        "contents": contents,
+        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1024},
       };
 
       final response = await http.post(
@@ -452,6 +501,35 @@ class AIController extends ChangeNotifier {
     final List tasks = jsonDecode(res.body)["data"] ?? [];
     if (tasks.isEmpty) return "No tasks.";
 
-    return tasks.map((t) => "- ${t["title"]} (${t["status"]})").join("\n");
+    final istNow = nowIST();
+
+    return tasks.map((t) {
+      final title = t["title"] ?? "Untitled";
+      final status = t["status"] ?? "pending";
+      final priority = t["priority"] ?? "medium";
+      final notes = (t["notes"] ?? "").toString().trim();
+
+      // Convert UTC dueDate → IST for display
+      String dueDateStr = "No due date";
+      if (t["dueDate"] != null && t["dueDate"].toString().isNotEmpty) {
+        final utcDate = DateTime.tryParse(t["dueDate"].toString());
+        if (utcDate != null) {
+          final istDate = utcDate.toUtc().add(istOffset);
+          dueDateStr = DateFormat("EEE, d MMM yyyy 'at' h:mm a").format(istDate);
+
+          // Label relative days for clarity
+          final todayIST = DateTime(istNow.year, istNow.month, istNow.day);
+          final taskDay = DateTime(istDate.year, istDate.month, istDate.day);
+          final diff = taskDay.difference(todayIST).inDays;
+          if (diff == 0) dueDateStr += " (TODAY)";
+          else if (diff == 1) dueDateStr += " (TOMORROW)";
+          else if (diff == -1) dueDateStr += " (YESTERDAY)";
+          else if (diff < -1) dueDateStr += " (OVERDUE)";
+        }
+      }
+
+      final notesPart = notes.isNotEmpty ? " | notes: $notes" : "";
+      return "- [$status] $title | due: $dueDateStr | priority: $priority$notesPart";
+    }).join("\n");
   }
 }
