@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/session_manager.dart';
-import 'core/services/notification_service.dart'; // ← Local notification fallback
 import 'core/services/fcm_service.dart'; // ← Real server-sent push notifications
 import 'package:client/features/auth/data/auth_api.dart';
 import 'package:client/features/auth/presentation/login_page.dart';
@@ -25,9 +24,6 @@ void main() async {
   if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
     // Initialize FCM service — real server-sent push notifications
     await FcmService.instance.init();
-
-    // Keep local notifications as a fallback channel
-    await NotificationService().init();
   } else {
     debugPrint("🖥️ Desktop/Web — skipping mobile notification initialization");
   }
@@ -100,7 +96,6 @@ class _MyAppState extends State<MyApp> {
         // Register FCM token with backend so server can send real push notifications
         if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
           await FcmService.instance.registerTokenWithBackend();
-          await NotificationService().scheduleAllNotifications();
         }
 
         return MainAppShell(userId: userId, onThemeChanged: _onThemeChanged);
@@ -206,13 +201,6 @@ class _MainAppShellState extends State<MainAppShell> {
     setState(() {
       _selectedIndex = index;
     });
-
-    // Refresh notifications when switching to relevant tabs
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-      if (index == 0 || index == 2) {
-        NotificationService().scheduleAllNotifications();
-      }
-    }
   }
 
   @override

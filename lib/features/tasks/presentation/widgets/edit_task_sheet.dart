@@ -1,11 +1,8 @@
 // lib/features/tasks/presentation/widgets/edit_task_sheet.dart
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:client/features/tasks/presentation/tasks_controller.dart';
 import 'package:client/features/calendar/presentation/calendar_controller.dart';
-import 'package:client/core/services/notification_service.dart';
 
 void showEditTaskSheet(BuildContext context, Map<String, dynamic> task) {
   final tasksController = Provider.of<TasksController>(context, listen: false);
@@ -525,11 +522,6 @@ class _EditTaskSheetState extends State<EditTaskSheet> {
     if (!mounted) return;
     if (updated != null) {
       widget.calendarController.upsertTaskLocal(updated);
-      // Cancel previous reminder and reschedule with new time
-      if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-        await NotificationService().cancelTaskReminder(taskId);
-        await NotificationService().scheduleTaskReminder(updated);
-      }
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Task updated!')));

@@ -21,7 +21,10 @@ class OTPVerificationPage extends StatefulWidget {
 }
 
 class _OTPVerificationPageState extends State<OTPVerificationPage> {
-  final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
+  final List<TextEditingController> _controllers = List.generate(
+    6,
+    (_) => TextEditingController(),
+  );
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _isLoading = false;
   String _errorMessage = '';
@@ -44,7 +47,7 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
     if (value.isEmpty && index > 0) {
       _focusNodes[index - 1].requestFocus();
     }
-    
+
     // Check if all fields are filled
     if (_controllers.every((c) => c.text.isNotEmpty)) {
       _verifyOTP();
@@ -64,21 +67,27 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
       final success = await AuthApi.verifyOtp(widget.email, otp);
       if (success) {
         if (!mounted) return;
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Email verified successfully! You can now login.")),
+          const SnackBar(
+            content: Text("Email verified successfully! You can now login."),
+          ),
         );
 
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => LoginPage(onThemeChanged: widget.onThemeChanged)),
+          MaterialPageRoute(
+            builder: (_) => LoginPage(onThemeChanged: widget.onThemeChanged),
+          ),
           (route) => false,
         );
       } else {
         setState(() => _errorMessage = "Verification failed");
       }
     } catch (e) {
-      setState(() => _errorMessage = e.toString().replaceFirst("Exception: ", ""));
+      setState(
+        () => _errorMessage = e.toString().replaceFirst("Exception: ", ""),
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -87,11 +96,16 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary;
-    final secondaryColor = isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary;
+    final textColor = isDark
+        ? AppTheme.darkTextPrimary
+        : AppTheme.lightTextPrimary;
+    final secondaryColor = isDark
+        ? AppTheme.darkTextSecondary
+        : AppTheme.lightTextSecondary;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: const Text("Verify Email"),
         backgroundColor: Colors.transparent,
@@ -102,18 +116,19 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
         ),
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 40),
+              const SizedBox(height: 32),
               Icon(
                 Icons.mark_email_read_outlined,
-                size: 80,
+                size: 72,
                 color: Theme.of(context).colorScheme.primary,
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
               Text(
                 "Check your email",
                 style: TextStyle(
@@ -126,33 +141,46 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
               Text(
                 "We've sent a 6-digit code to\n${widget.email}",
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: secondaryColor,
-                ),
+                style: TextStyle(fontSize: 15, color: secondaryColor),
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 40),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: List.generate(6, (index) {
                   return SizedBox(
-                    width: 45,
+                    width: 48,
+                    height: 58,
                     child: TextField(
                       controller: _controllers[index],
                       focusNode: _focusNodes[index],
                       keyboardType: TextInputType.number,
                       textAlign: TextAlign.center,
                       maxLength: 1,
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
                       decoration: InputDecoration(
                         counterText: "",
+                        filled: true,
+                        fillColor: isDark
+                            ? Colors.white.withOpacity(0.08)
+                            : Colors.grey.shade100,
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Theme.of(context).dividerColor),
+                          borderSide: BorderSide(
+                            color: isDark
+                                ? Colors.white24
+                                : Colors.grey.shade300,
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).colorScheme.primary,
+                            width: 2,
+                          ),
                         ),
                       ),
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -162,13 +190,13 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                 }),
               ),
               if (_errorMessage.isNotEmpty) ...[
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
                 Text(
                   _errorMessage,
                   style: const TextStyle(color: Colors.red, fontSize: 14),
                 ),
               ],
-              const SizedBox(height: 48),
+              const SizedBox(height: 36),
               SizedBox(
                 width: double.infinity,
                 height: 54,
@@ -177,21 +205,32 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                     : ElevatedButton(
                         onPressed: _verifyOTP,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primary,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(27)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(27),
+                          ),
                         ),
-                        child: const Text("Verify", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          "Verify",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               TextButton(
-                onPressed: _isLoading ? null : () {
-                  // TODO: Implement resend OTP if needed
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Feature coming soon")),
-                  );
-                },
+                onPressed: _isLoading
+                    ? null
+                    : () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Feature coming soon")),
+                        );
+                      },
                 child: Text(
                   "Resend Code",
                   style: TextStyle(
@@ -200,6 +239,7 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                   ),
                 ),
               ),
+              const SizedBox(height: 24),
             ],
           ),
         ),

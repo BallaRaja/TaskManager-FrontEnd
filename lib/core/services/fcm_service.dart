@@ -4,11 +4,11 @@
 //
 // Flow:
 //   Backend cron â†’ FCM (data-only) â†’ device
-//     â€¢ App in FOREGROUND  â†’ onMessage â†’ showActionNotification()
-//     â€¢ App BACKGROUND/KILLED â†’ _fcmBackgroundHandler â†’ showActionNotification()
+//     App in FOREGROUND  â†’ onMessage â†’ showActionNotification()
+//     App BACKGROUND/KILLED â†’ _fcmBackgroundHandler â†’ showActionNotification()
 //   User taps action button:
-//     â€¢ "Mark as Done"      â†’ POST /api/notifications/mark-done/:taskId
-//     â€¢ "Extend 30 Minutes" â†’ POST /api/notifications/extend/:taskId
+//     "Mark as Done"      â†’ POST /api/notifications/mark-done/:taskId
+//     "Extend 30 Minutes" â†’ POST /api/notifications/extend/:taskId
 
 import 'dart:convert';
 import 'dart:io' show Platform;
@@ -109,7 +109,7 @@ Future<void> _showActionNotification(Map<String, dynamic> data) async {
       ),
       const AndroidNotificationAction(
         kActionMarkDone,
-        'âœ… Mark as Done',
+        'Mark as Done',
         showsUserInterface: false,
         cancelNotification: true,
       ),
@@ -118,7 +118,7 @@ Future<void> _showActionNotification(Map<String, dynamic> data) async {
     androidActions.add(
       const AndroidNotificationAction(
         kActionMarkDone,
-        'âœ… Mark as Done',
+        'Mark as Done',
         showsUserInterface: false,
         cancelNotification: true,
       ),
@@ -187,7 +187,7 @@ Future<void> _handleActionResponse(NotificationResponse response) async {
 
   try {
     if (actionId == kActionMarkDone) {
-      debugPrint('âœ… [FCM] Action "Mark as Done" for task $taskId');
+      debugPrint('[FCM] Action "Mark as Done" for task $taskId');
       await http.post(
         Uri.parse(
           '${ApiConstants.backendUrl}/api/notifications/mark-done/$taskId',
@@ -198,7 +198,7 @@ Future<void> _handleActionResponse(NotificationResponse response) async {
         },
       );
     } else if (actionId == kActionExtend30) {
-      debugPrint('ðŸ” [FCM] Action "Extend 30 min" for task $taskId');
+      debugPrint('[FCM] Action "Extend 30 min" for task $taskId');
       await http.post(
         Uri.parse(
           '${ApiConstants.backendUrl}/api/notifications/extend/$taskId',

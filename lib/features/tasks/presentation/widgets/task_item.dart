@@ -1,13 +1,10 @@
 // lib/features/tasks/presentation/widgets/task_item.dart
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:client/core/constants/api_constants.dart';
 import 'package:client/core/utils/session_manager.dart';
-import 'package:client/core/services/notification_service.dart';
 import 'package:client/features/tasks/presentation/tasks_controller.dart';
 import 'package:client/features/tasks/presentation/widgets/edit_task_sheet.dart';
 
@@ -113,14 +110,7 @@ class TaskItem extends StatelessWidget {
           context,
         ).showSnackBar(const SnackBar(content: Text("Failed to update task")));
       } else if (success != null) {
-        // Cancel reminder if task is completed; reschedule if uncompleted
-        if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-          if (newStatus == "completed") {
-            await NotificationService().cancelTaskReminder(taskId);
-          } else {
-            await NotificationService().scheduleTaskReminder(success);
-          }
-        }
+        // Task status updated successfully
       }
     } catch (e) {
       if (context.mounted) {
@@ -198,10 +188,6 @@ class TaskItem extends StatelessWidget {
     try {
       await tasksCtrl.deleteTask(taskId);
       calendarCtrl.removeTaskLocal(taskId);
-      // Cancel any scheduled reminder for this task
-      if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-        await NotificationService().cancelTaskReminder(taskId);
-      }
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

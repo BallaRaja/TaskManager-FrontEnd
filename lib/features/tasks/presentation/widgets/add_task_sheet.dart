@@ -1,11 +1,8 @@
 // lib/features/tasks/presentation/widgets/add_task_sheet.dart
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:client/features/tasks/presentation/tasks_controller.dart';
 import 'package:client/features/calendar/presentation/calendar_controller.dart';
-import 'package:client/core/services/notification_service.dart';
 
 void showAddTaskSheet(BuildContext context) {
   final tasksController = Provider.of<TasksController>(context, listen: false);
@@ -532,11 +529,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       if (createdTask != null) {
         widget.calendarController.upsertTaskLocal(createdTask);
 
-        // Schedule 2-min reminder if task has a due date/time
-        if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-          await NotificationService().scheduleTaskReminder(createdTask);
-        }
-
         // Close sheet first, then show success popup using the page context
         if (mounted) Navigator.pop(context);
         _showTaskCreatedDialog(widget.pageContext, createdTask);
@@ -664,24 +656,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                 ],
               ),
             ),
-            if (dueIso != null) ...[
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.notifications_active,
-                    size: 14,
-                    color: Colors.purple[300],
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Reminder set for 2 min before',
-                    style: TextStyle(fontSize: 12, color: Colors.purple[400]),
-                  ),
-                ],
-              ),
-            ],
           ],
         ),
         actions: [

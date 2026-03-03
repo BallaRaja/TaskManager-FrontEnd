@@ -29,7 +29,7 @@ class TasksPage extends StatefulWidget {
   State<TasksPage> createState() => _TasksPageState();
 }
 
-class _TasksPageState extends State<TasksPage> {
+class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
   late TaskViewType _viewType;
   late Timer _clockTimer;
   DateTime _now = DateTime.now();
@@ -38,6 +38,10 @@ class _TasksPageState extends State<TasksPage> {
   void initState() {
     super.initState();
     _viewType = widget.initialViewType;
+
+    // Listen for app lifecycle changes so we can refresh tasks when the app
+    // resumes after the user tapped a notification action (mark done / extend).
+    WidgetsBinding.instance.addObserver(this);
 
     // 🔄 Update time every second (to show seconds)
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -49,8 +53,21 @@ class _TasksPageState extends State<TasksPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _clockTimer.cancel();
     super.dispose();
+  }
+
+  /// Called by the OS whenever the app lifecycle state changes.
+  /// When the app returns to the foreground (resumed) we refresh the task
+  /// list so that changes made via notification actions (mark-done / extend)
+  /// are reflected immediately without the user having to pull-to-refresh.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final controller = Provider.of<TasksController>(context, listen: false);
+      controller.refresh();
+    }
   }
 
   String get _formattedTime {
