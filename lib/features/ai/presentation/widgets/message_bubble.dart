@@ -8,6 +8,8 @@ class MessageBubble extends StatelessWidget {
   final bool isLast;
   final bool showCreateTaskButton;
   final VoidCallback? onCreateTaskPressed;
+  // User profile photo URL (shown right of user bubbles)
+  final String? userAvatarUrl;
 
   const MessageBubble({
     super.key,
@@ -15,6 +17,7 @@ class MessageBubble extends StatelessWidget {
     this.isLast = false,
     this.showCreateTaskButton = false,
     this.onCreateTaskPressed,
+    this.userAvatarUrl,
   });
 
   @override
@@ -31,29 +34,73 @@ class MessageBubble extends StatelessWidget {
     final assistantTextColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
 
     return Column(
-      crossAxisAlignment: isUser
-          ? CrossAxisAlignment.end
-          : CrossAxisAlignment.start,
+      crossAxisAlignment:
+          isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
-        Align(
-          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-            padding: const EdgeInsets.all(14),
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.75,
-            ),
-            decoration: BoxDecoration(
-              color: isUser ? userBubbleColor : assistantBubbleColor,
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Text(
-              message.content,
-              style: TextStyle(
-                color: isUser ? Colors.white : assistantTextColor,
-                fontSize: 15,
+        // ── Row: avatar (assistant only) + bubble ──────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment:
+                isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+            children: [
+              // Avatar shown only for assistant messages
+              if (!isUser) ...[
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Colors.transparent,
+                  backgroundImage:
+                      const AssetImage('assets/AiProfile.png'),
+                ),
+                const SizedBox(width: 8),
+              ],
+
+              // Message bubble
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.72,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isUser ? userBubbleColor : assistantBubbleColor,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(18),
+                      topRight: const Radius.circular(18),
+                      bottomLeft: isUser
+                          ? const Radius.circular(18)
+                          : const Radius.circular(4),
+                      bottomRight: isUser
+                          ? const Radius.circular(4)
+                          : const Radius.circular(18),
+                    ),
+                  ),
+                  child: Text(
+                    message.content,
+                    style: TextStyle(
+                      color: isUser ? Colors.white : assistantTextColor,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
               ),
-            ),
+
+              // User avatar (right side)
+              if (isUser) ...[  
+                const SizedBox(width: 8),
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Colors.purple.shade200,
+                  backgroundImage: (userAvatarUrl != null)
+                      ? NetworkImage(userAvatarUrl!) as ImageProvider
+                      : null,
+                  child: userAvatarUrl == null
+                      ? const Icon(Icons.person, size: 20, color: Colors.white)
+                      : null,
+                ),
+              ],
+            ],
           ),
         ),
 

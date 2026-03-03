@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models/message.dart';
 import '../../core/constants/api_constants.dart';
@@ -14,22 +15,170 @@ class AIController extends ChangeNotifier {
   List<ChatMessage> messages = [];
   bool isLoading = false;
 
+  /// Suggestion chips shown in the empty state
+  List<String> suggestions = [];
+  bool isLoadingSuggestions = false;
+
   /// Task waiting for user confirmation
   Map<String, dynamic>? pendingTaskToCreate;
 
   /// IST offset (fixed for India)
   static const Duration istOffset = Duration(hours: 5, minutes: 30);
 
+  static const String _chatKey = 'ai_chat_messages';
+  static const String _suggestionsKey = 'ai_suggestions';
+
+  /* ───────────────────────── INIT ───────────────────────── */
+
+  /// Call once after creating the controller to restore persisted state.
+  Future<void> init() async {
+    await _loadMessages();
+    await _loadSuggestions();
+    // Refresh suggestions in background (only if we have none yet)
+    if (suggestions.isEmpty) {
+      fetchSuggestions();
+    }
+  }
+
+  /* ───────────────────────── PERSISTENCE ───────────────────────── */
+
+  Future<void> _saveMessages() async {
+    final prefs = await SharedPreferences.getInstance();
+    final encoded = jsonEncode(
+      messages.map((m) => {
+        'content': m.content,
+        'role': m.role.name,
+        'timestamp': m.timestamp.toIso8601String(),
+      }).toList(),
+    );
+    await prefs.setString(_chatKey, encoded);
+  }
+
+  Future<void> _loadMessages() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_chatKey);
+      if (raw == null || raw.isEmpty) return;
+      final List decoded = jsonDecode(raw);
+      messages = decoded.map((e) {
+        return ChatMessage(
+          content: e['content'] as String,
+          role: MessageRole.values.firstWhere(
+            (r) => r.name == e['role'],
+            orElse: () => MessageRole.user,
+          ),
+          timestamp: DateTime.tryParse(e['timestamp'] ?? '') ?? DateTime.now(),
+        );
+      }).toList();
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> _saveSuggestions(List<String> chips) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_suggestionsKey, jsonEncode(chips));
+  }
+
+  Future<void> _loadSuggestions() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_suggestionsKey);
+      if (raw == null || raw.isEmpty) return;
+      final List decoded = jsonDecode(raw);
+      suggestions = List<String>.from(decoded);
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /* ───────────────────────── DYNAMIC SUGGESTIONS ───────────────────────── */
+
+  Future<void> fetchSuggestions() async {
+    if (isLoadingSuggestions) return;
+    isLoadingSuggestions = true;
+    notifyListeners();
+
+    try {
+      final taskContext = await _fetchTaskContext();
+      final istNow = nowIST();
+
+      final uri = Uri.parse(
+        "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=$apiKey",
+      );
+
+      final body = {
+        "contents": [
+          {
+            "role": "user",
+            "parts": [
+              {
+                "text":
+                    "You are a task management AI assistant. "
+                    "Based on the user's current tasks and the time, generate exactly 4 short, "
+                    "helpful suggestion chip labels (max 6 words each) that the user might want to ask. "
+                    "Return ONLY a JSON array of 4 strings, no explanation, no markdown.\n\n"
+                    "Current IST time: ${DateFormat('EEE d MMM, h:mm a').format(istNow)}\n"
+                    "Current tasks:\n$taskContext",
+              },
+            ],
+          },
+        ],
+        "generationConfig": {"temperature": 0.7, "maxOutputTokens": 150},
+      };
+
+      final response = await http.post(
+        uri,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(body),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final text =
+            data["candidates"][0]["content"]["parts"][0]["text"] as String;
+
+        // Extract the JSON array robustly
+        final arrayMatch = RegExp(r'\[.*?\]', dotAll: true).firstMatch(text);
+        if (arrayMatch != null) {
+          final chips = List<String>.from(jsonDecode(arrayMatch.group(0)!));
+          if (chips.length >= 2) {
+            suggestions = chips.take(4).toList();
+            await _saveSuggestions(suggestions);
+            notifyListeners();
+            return;
+          }
+        }
+      }
+    } catch (_) {}
+
+    // Fallback chips if Gemini fails
+    if (suggestions.isEmpty) {
+      suggestions = [
+        "What's my schedule today?",
+        "Show overdue tasks",
+        "Add a task for tomorrow",
+        "Give me a productivity tip",
+      ];
+      notifyListeners();
+    }
+
+    isLoadingSuggestions = false;
+    notifyListeners();
+  }
+
   /* ───────────────────────── HELPERS ───────────────────────── */
 
   void addMessage(String content, MessageRole role) {
     messages.add(ChatMessage(content: content, role: role));
+    _saveMessages();
     notifyListeners();
   }
 
   void clearChat() {
     messages.clear();
     pendingTaskToCreate = null;
+    _saveMessages();
+    // Refresh suggestions after clearing
+    fetchSuggestions();
     notifyListeners();
   }
 

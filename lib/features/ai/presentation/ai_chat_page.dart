@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../ai_controller.dart';
 import 'widgets/message_bubble.dart';
 import 'widgets/suggestion_chip.dart';
+import 'widgets/typing_indicator.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/utils/session_manager.dart';
 
@@ -20,21 +21,55 @@ class AIChatPage extends StatefulWidget {
 class _AIChatPageState extends State<AIChatPage> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  late final AIController _aiController;
 
   List<Map<String, dynamic>> _taskLists = [];
-  bool _isLoadingLists = false;
-
-  final List<String> suggestions = [
-    "What's my schedule today?",
-    "Add task: Buy milk tomorrow",
-    "Show me overdue tasks",
-    "Give me a productivity tip",
-  ];
+  String? _userAvatarUrl;
 
   @override
   void initState() {
     super.initState();
+    _aiController = AIController();
+    _aiController.init();
     _fetchTaskLists();
+    _fetchUserAvatar();
+  }
+
+  @override
+  void dispose() {
+    _aiController.dispose();
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchUserAvatar() async {
+    try {
+      final token = await SessionManager.getToken();
+      final userId = await SessionManager.getUserId();
+      if (token == null || userId == null) return;
+
+      final res = await http.get(
+        Uri.parse('${ApiConstants.backendUrl}/api/profile/$userId'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final raw = data['data']?['profile']?['avatarUrl']?.toString() ?? '';
+        if (raw.isNotEmpty && !raw.contains('placeholder')) {
+          String fullUrl;
+          if (raw.startsWith('http')) {
+            fullUrl = raw;
+          } else if (raw.startsWith('/')) {
+            fullUrl = '${ApiConstants.backendUrl}$raw';
+          } else {
+            return;
+          }
+          if (mounted) setState(() => _userAvatarUrl = fullUrl);
+        }
+      }
+    } catch (_) {}
   }
 
   void _scrollToBottom() {
@@ -52,8 +87,6 @@ class _AIChatPageState extends State<AIChatPage> {
   /// 🔹 Fetch taskLists for user
   Future<void> _fetchTaskLists() async {
     try {
-      setState(() => _isLoadingLists = true);
-
       final userId = await SessionManager.getUserId();
       if (userId == null) return;
 
@@ -76,8 +109,6 @@ class _AIChatPageState extends State<AIChatPage> {
       }
     } catch (e) {
       debugPrint("❌ TaskList fetch error: $e");
-    } finally {
-      setState(() => _isLoadingLists = false);
     }
   }
 
@@ -123,8 +154,8 @@ class _AIChatPageState extends State<AIChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AIController(),
+    return ChangeNotifierProvider.value(
+      value: _aiController,
       child: Consumer<AIController>(
         builder: (context, aiController, _) {
           _scrollToBottom();
@@ -146,19 +177,40 @@ class _AIChatPageState extends State<AIChatPage> {
                 if (aiController.messages.isEmpty)
                   Expanded(
                     child: Center(
-                      child: Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: suggestions.map((s) {
-                          return SuggestionChip(
-                            label: s,
-                            onTap: () {
-                              _controller.text = s;
-                              aiController.sendMessage(s);
-                            },
-                          );
-                        }).toList(),
-                      ),
+                      child: aiController.isLoadingSuggestions &&
+                              aiController.suggestions.isEmpty
+                          ? Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.purple,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  "Preparing suggestions…",
+                                  style: TextStyle(
+                                    color: Colors.grey[500],
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Wrap(
+                              spacing: 12,
+                              runSpacing: 12,
+                              alignment: WrapAlignment.center,
+                              children: aiController.suggestions.map((s) {
+                                return SuggestionChip(
+                                  label: s,
+                                  onTap: () {
+                                    _controller.text = s;
+                                    aiController.sendMessage(s);
+                                    _controller.clear();
+                                  },
+                                );
+                              }).toList(),
+                            ),
                     ),
                   )
                 else
@@ -166,8 +218,17 @@ class _AIChatPageState extends State<AIChatPage> {
                     child: ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.fromLTRB(12, 12, 12, 120),
-                      itemCount: aiController.messages.length,
+                      itemCount: aiController.messages.length +
+                          (aiController.isLoading ? 1 : 0),
                       itemBuilder: (context, index) {
+                        // Show typing indicator as the last item while loading
+                        if (aiController.isLoading &&
+                            index == aiController.messages.length) {
+                          return const Align(
+                            alignment: Alignment.centerLeft,
+                            child: TypingIndicator(),
+                          );
+                        }
                         final msg = aiController.messages[index];
                         final isLast =
                             index == aiController.messages.length - 1;
@@ -177,7 +238,10 @@ class _AIChatPageState extends State<AIChatPage> {
                               ? CrossAxisAlignment.end
                               : CrossAxisAlignment.start,
                           children: [
-                            MessageBubble(message: msg),
+                            MessageBubble(
+                              message: msg,
+                              userAvatarUrl: _userAvatarUrl,
+                            ),
 
                             // 🔥 Task confirmation actions
                             if (isLast &&
