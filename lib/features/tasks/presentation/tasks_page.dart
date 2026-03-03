@@ -13,6 +13,8 @@ import 'package:client/features/tasks/presentation/tasks_controller.dart';
 import 'package:client/features/tasks/presentation/task_view_type.dart';
 import 'package:client/features/tasks/presentation/widgets/task_list_tab.dart';
 import 'package:client/features/tasks/presentation/widgets/task_item.dart';
+import 'package:client/features/ai/presentation/day_planner_page.dart';
+import 'package:client/features/ai/presentation/week_planner_page.dart';
 import 'widgets/completed_section.dart';
 
 class TasksPage extends StatefulWidget {
@@ -436,6 +438,64 @@ class _TasksPageState extends State<TasksPage> {
                       MaterialPageRoute(builder: (_) => const SummaryPage()),
                     );
                   }, false),
+
+                  // ── AI PLANNER section ──
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 4),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(20, 8, 20, 8),
+                    child: Text(
+                      'AI PLANNER',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.grey,
+                        letterSpacing: 1.4,
+                      ),
+                    ),
+                  ),
+                  _panelTile(
+                    ctx,
+                    Icons.today_rounded,
+                    'Day Planner',
+                    () {
+                      Navigator.pop(ctx);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const DayPlannerPage()),
+                      ).then((refreshed) {
+                        if (refreshed == true) {
+                          context
+                              .read<TasksController>()
+                              .refresh();
+                        }
+                      });
+                    },
+                    false,
+                  ),
+                  _panelTile(
+                    ctx,
+                    Icons.date_range_rounded,
+                    'Week Planner',
+                    () {
+                      Navigator.pop(ctx);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const WeekPlannerPage()),
+                      ).then((refreshed) {
+                        if (refreshed == true) {
+                          context
+                              .read<TasksController>()
+                              .refresh();
+                        }
+                      });
+                    },
+                    false,
+                  ),
+
                   // ── MY LISTS + Logout section ──
                   ..._buildSidePanelLists(ctx, controller),
                 ],
