@@ -18,10 +18,22 @@ class CalendarTaskTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final title = task['title'] as String? ?? 'Untitled';
+    final DateTime? due = task['dueDate'] != null
+        ? DateTime.parse(task['dueDate']).toLocal()
+        : null;
     final isCompleted = task['status'] == 'completed';
     final isImportant = task['priority'] == 'high';
     final timeLabel = _timeLabel(task['dueDate'] as String?);
     final notes = task['notes'] as String?;
+    // hide status information if the task is scheduled for a day strictly
+    // after today. We still allow tapping/editing.
+    bool showStatus = true;
+    if (due != null) {
+      final today = DateTime.now();
+      final normToday = DateTime(today.year, today.month, today.day);
+      final normDue = DateTime(due.year, due.month, due.day);
+      if (normDue.isAfter(normToday)) showStatus = false;
+    }
 
     return GestureDetector(
       onTap: () => showCalendarTaskDetail(context, task),
@@ -46,35 +58,37 @@ class CalendarTaskTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Status indicator
-            Container(
-              width: 4,
-              height: 40,
-              decoration: BoxDecoration(
-                color: isCompleted
-                    ? Colors.green
-                    : isImportant
-                    ? Colors.amber
-                    : Colors.purple,
-                borderRadius: BorderRadius.circular(2),
+            // Status indicator (hide if future)
+            if (showStatus) ...[
+              Container(
+                width: 4,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: isCompleted
+                      ? Colors.green
+                      : isImportant
+                          ? Colors.amber
+                          : Colors.purple,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(width: 14),
+              const SizedBox(width: 14),
+            ],
 
             // Title + subtitle
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                    Text(
                     title,
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      decoration: isCompleted
+                      decoration: (showStatus && isCompleted)
                           ? TextDecoration.lineThrough
                           : null,
-                      color: isCompleted ? Colors.grey : null,
+                      color: (showStatus && isCompleted) ? Colors.grey : null,
                     ),
                   ),
                   if (timeLabel != null || notes != null)
@@ -96,7 +110,7 @@ class CalendarTaskTile extends StatelessWidget {
                 if (isImportant)
                   const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
                 const SizedBox(width: 4),
-                if (isCompleted)
+                if (showStatus && isCompleted)
                   const Icon(
                     Icons.check_circle_rounded,
                     color: Colors.green,

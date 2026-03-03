@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import '../../../core/constants/api_constants.dart';
 
@@ -45,6 +46,7 @@ class AuthApi {
   ) async {
     print("➡️ [AuthApi] login() called");
     print("   Email: $email");
+    print("   URL: ${ApiConstants.baseUrl}/login");
 
     try {
       final res = await http
@@ -53,7 +55,7 @@ class AuthApi {
             headers: {"Content-Type": "application/json"},
             body: jsonEncode({"email": email, "password": password}),
           )
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 15)); // Increased from 8 to 15
 
       print("⬅️ [AuthApi] login status: ${res.statusCode}");
       print("   Body: ${res.body}");
@@ -66,6 +68,11 @@ class AuthApi {
 
       final data = jsonDecode(res.body);
       throw Exception(data["error"] ?? "Login failed");
+    } on TimeoutException catch (e) {
+      print("❌ [AuthApi] Login TIMEOUT (15s) - Backend not reachable!");
+      print("   Verify backend is running on ${ApiConstants.baseUrl}");
+      print("   Check network connectivity & correct IP address");
+      throw Exception("Connection timeout - backend unreachable. Check IP: ${ApiConstants.baseUrl}");
     } catch (e) {
       print("❌ [AuthApi] Login exception: $e");
       throw Exception(e.toString().replaceFirst("Exception: ", ""));

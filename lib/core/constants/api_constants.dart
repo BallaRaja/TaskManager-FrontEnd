@@ -1,6 +1,7 @@
 class ApiConstants {
-  static const String baseUrl = "http://10.12.151.30:5000/api/auth";
-  static const String backendUrl = "http://10.12.151.30:5000";
+  // Update with your actual machine IP from 'ipconfig'
+  static const String baseUrl = "https://10.189.150.177:5000/api/auth";
+  static const String backendUrl = "https://10.189.150.177:5000";
   static const String geminiApiKey = "AIzaSyDO4-DmO23wIf2ipCzqYunqdWC8zkw7InI";
   // "https://taskmanager-backend-i2cj.onrender.com/api/auth";
 }

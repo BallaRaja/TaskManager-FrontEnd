@@ -1,6 +1,7 @@
 // lib/features/profile/presentation/avatar_crop_page.dart
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -28,8 +29,11 @@ class _AvatarCropPageState extends State<AvatarCropPage>
   static const double _minScale = 1.0;
   static const double _maxScale = 5.0;
 
+  Timer? _scaleUpdateTimer;
+
   @override
   void dispose() {
+    _scaleUpdateTimer?.cancel();
     _transformCtrl.dispose();
     super.dispose();
   }
@@ -40,13 +44,18 @@ class _AvatarCropPageState extends State<AvatarCropPage>
     setState(() => _isCropping = true);
     try {
       // Capture the rendered pixels of the circular viewport
-      final boundary =
-          _repaintKey.currentContext!.findRenderObject()
-              as RenderRepaintBoundary;
-      final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      final boundary = _repaintKey.currentContext!.findRenderObject()
+          as RenderRepaintBoundary;
+
+      // Reduce capture pixelRatio to avoid creating very large bitmaps
+      final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
+      final double pixelRatio = (devicePixelRatio * 1.5).clamp(1.0, 2.0);
+
+      final ui.Image image = await boundary.toImage(pixelRatio: pixelRatio);
       final ByteData? byteData = await image.toByteData(
         format: ui.ImageByteFormat.png,
       );
+
       if (byteData == null) throw Exception('Failed to encode image');
 
       final Uint8List bytes = byteData.buffer.asUint8List();
@@ -147,9 +156,12 @@ class _AvatarCropPageState extends State<AvatarCropPage>
                             minScale: _minScale,
                             maxScale: _maxScale,
                             onInteractionUpdate: (details) {
-                              final scale = _transformCtrl.value
-                                  .getMaxScaleOnAxis();
-                              setState(() => _currentScale = scale);
+                              final scale = _transformCtrl.value.getMaxScaleOnAxis();
+                              // Throttle UI updates to avoid excessive rebuilds while pinching
+                              _scaleUpdateTimer?.cancel();
+                              _scaleUpdateTimer = Timer(const Duration(milliseconds: 80), () {
+                                if (mounted) setState(() => _currentScale = scale);
+                              });
                             },
                             child: Image.file(
                               widget.imageFile,

@@ -22,7 +22,7 @@ class _AIChatPageState extends State<AIChatPage> {
   final ScrollController _scrollController = ScrollController();
 
   List<Map<String, dynamic>> _taskLists = [];
-  bool _isLoadingLists = false;
+  bool _isLoadingLists = false; // tracks network fetch state
 
   final List<String> suggestions = [
     "What's my schedule today?",

@@ -24,7 +24,6 @@ class _CalendarTaskDetailSheet extends StatefulWidget {
 
 class _CalendarTaskDetailSheetState extends State<_CalendarTaskDetailSheet> {
   late Map<String, dynamic> _task;
-  bool _toggling = false;
 
   @override
   void initState() {
@@ -61,21 +60,6 @@ class _CalendarTaskDetailSheetState extends State<_CalendarTaskDetailSheet> {
       default:
         return 'No repeat';
     }
-  }
-
-  Future<void> _toggleComplete() async {
-    if (_toggling) return;
-    setState(() => _toggling = true);
-    final controller = Provider.of<CalendarController>(context, listen: false);
-    final success = await controller.toggleTaskComplete(_task);
-    if (success && mounted) {
-      setState(() {
-        _task['status'] = _task['status'] == 'completed'
-            ? 'pending'
-            : 'completed';
-      });
-    }
-    if (mounted) setState(() => _toggling = false);
   }
 
   @override
@@ -127,29 +111,13 @@ class _CalendarTaskDetailSheetState extends State<_CalendarTaskDetailSheet> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Complete toggle button
-                  GestureDetector(
-                    onTap: _toggleComplete,
-                    child: _toggling
-                        ? const SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: Colors.white,
-                            ),
-                          )
-                        : AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 250),
-                            child: Icon(
-                              _isCompleted
-                                  ? Icons.check_circle_rounded
-                                  : Icons.radio_button_unchecked_rounded,
-                              key: ValueKey(_isCompleted),
-                              color: Colors.white,
-                              size: 28,
-                            ),
-                          ),
+                  // Status indicator (read-only)
+                  Icon(
+                    _isCompleted
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: Colors.white,
+                    size: 28,
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -254,36 +222,6 @@ class _CalendarTaskDetailSheetState extends State<_CalendarTaskDetailSheet> {
                     ),
 
                   const SizedBox(height: 20),
-
-                  // Toggle complete button
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: _isCompleted
-                            ? Colors.grey[600]
-                            : Colors.purple,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      onPressed: _toggling ? null : _toggleComplete,
-                      icon: Icon(
-                        _isCompleted
-                            ? Icons.undo_rounded
-                            : Icons.check_circle_outline_rounded,
-                        size: 20,
-                      ),
-                      label: Text(
-                        _isCompleted ? 'Mark as Pending' : 'Mark as Complete',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),

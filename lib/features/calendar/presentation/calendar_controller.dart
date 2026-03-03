@@ -107,14 +107,59 @@ class CalendarController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Toggle a task's completion status and refresh the list.
+  /// Determine whether a specific occurrence of a (possibly repeating) task
+  /// is marked completed based on the `completedDates` array that we will
+  /// start storing on the backend.
+  bool _isInstanceCompleted(Map<String, dynamic> task, DateTime date) {
+    // non-repeating tasks rely on the regular status field
+    if (task['repeat'] == null) {
+      return task['status'] == 'completed';
+    }
+    final List<dynamic> completed = task['completedDates'] ?? [];
+    for (final d in completed) {
+      try {
+        final dt = DateTime.parse(d.toString()).toLocal();
+        if (dt.year == date.year && dt.month == date.month && dt.day == date.day) {
+          return true;
+        }
+      } catch (_) {}
+    }
+    return false;
+  }
+
+  /// Toggle a task's completion status for a given instance or globally.
+  /// After updating the server we refresh the list to make sure the local
+  /// copy stays accurate (especially because the backend may rewrite the
+  /// `completedDates` array).
   Future<bool> toggleTaskComplete(Map<String, dynamic> task) async {
     final token = _token ?? await SessionManager.getToken();
     if (token == null) return false;
     final taskId = task['_id']?.toString();
     if (taskId == null) return false;
 
-    final newStatus = task['status'] == 'completed' ? 'pending' : 'completed';
+    // figure out the target instance date (if available)
+    DateTime? instanceDate;
+    if (task['dueDate'] != null) {
+      instanceDate = DateTime.parse(task['dueDate']).toLocal();
+    }
+
+    // compute new status: if instanceDate exists and the task is repeating we
+    // look up the instance status, otherwise use the simple status field.
+    final bool currentlyCompleted = instanceDate != null && task['repeat'] != null
+        ? _isInstanceCompleted(task, instanceDate)
+        : task['status'] == 'completed';
+
+    final newStatus = currentlyCompleted ? 'pending' : 'completed';
+
+    final body = <String, dynamic>{'status': newStatus};
+    if (instanceDate != null) {
+      body['instanceDate'] = instanceDate.toIso8601String();
+    }
+    if (newStatus == 'completed') {
+      body['completedAt'] = DateTime.now().toIso8601String();
+    } else {
+      body['completedAt'] = null;
+    }
 
     try {
       final response = await http.put(
@@ -123,20 +168,13 @@ class CalendarController extends ChangeNotifier {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({
-          'status': newStatus,
-          if (newStatus == 'completed')
-            'completedAt': DateTime.now().toIso8601String(),
-          if (newStatus == 'pending') 'completedAt': null,
-        }),
+        body: jsonEncode(body),
       );
       if (response.statusCode == 200) {
-        // Update in-memory task list
-        final idx = _tasks.indexWhere((t) => t['_id']?.toString() == taskId);
-        if (idx != -1) {
-          _tasks[idx] = Map<String, dynamic>.from(_tasks[idx]);
-          _tasks[idx]['status'] = newStatus;
-        }
+        // server returns updated task; rather than manually patching the list
+        // it's simpler to refetch everything so that completedDates etc are
+        // in sync.
+        await _fetchTasks();
         notifyListeners();
         return true;
       }
@@ -206,7 +244,7 @@ class CalendarController extends ChangeNotifier {
 
       // Convert UTC → local for correct hour/minute assignment
       final baseDue = DateTime.parse(dueStr).toLocal();
-      if (hasInstanceOnDate(task, normalizedDate)) {
+        if (hasInstanceOnDate(task, normalizedDate)) {
         final instance = Map<String, dynamic>.from(task);
         final instanceDue = DateTime(
           normalizedDate.year,
@@ -217,6 +255,12 @@ class CalendarController extends ChangeNotifier {
         );
         // Store as UTC for consistent internal representation
         instance["dueDate"] = instanceDue.toUtc().toIso8601String();
+        // override status for this particular occurrence
+        if (_isInstanceCompleted(task, normalizedDate)) {
+          instance['status'] = 'completed';
+        } else {
+          instance['status'] = 'pending';
+        }
         instances.add(instance);
       }
     }
@@ -234,7 +278,7 @@ class CalendarController extends ChangeNotifier {
     final cutoff = now.subtract(const Duration(days: 365));
 
     for (final task in _tasks) {
-      if (task["isArchived"] == true || task["status"] == "completed") continue;
+      if (task["isArchived"] == true) continue;
       final dueStr = task["dueDate"] as String?;
       if (dueStr == null) continue;
 
@@ -245,9 +289,11 @@ class CalendarController extends ChangeNotifier {
 
       while (current.isBefore(now) && current.isAfter(cutoff)) {
         if (hasInstanceOnDate(task, current)) {
-          final instance = Map<String, dynamic>.from(task);
-          instance["dueDate"] = current.toUtc().toIso8601String();
-          overdue.add(instance);
+          if (!_isInstanceCompleted(task, current)) {
+            final instance = Map<String, dynamic>.from(task);
+            instance["dueDate"] = current.toUtc().toIso8601String();
+            overdue.add(instance);
+          }
         }
         if (repeat == null) break;
 
