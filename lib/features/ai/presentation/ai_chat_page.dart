@@ -8,6 +8,7 @@ import '../ai_controller.dart';
 import 'widgets/message_bubble.dart';
 import 'widgets/suggestion_chip.dart';
 import 'widgets/typing_indicator.dart';
+import 'widgets/task_created_overlay.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/utils/session_manager.dart';
 
@@ -265,9 +266,11 @@ class _AIChatPageState extends State<AIChatPage> {
                                                 .pendingTaskToCreate!["taskListId"] =
                                             defaultList["_id"];
 
-                                        await aiController.confirmTaskCreation(
-                                          context,
-                                        );
+                                        final ok = await aiController
+                                            .confirmTaskCreation(context);
+                                        if (ok && context.mounted) {
+                                          TaskCreatedOverlay.show(context);
+                                        }
                                       },
                                       child: const Text("Add to Default"),
                                     ),
@@ -280,8 +283,11 @@ class _AIChatPageState extends State<AIChatPage> {
                                           aiController
                                                   .pendingTaskToCreate!["taskListId"] =
                                               listId;
-                                          await aiController
+                                          final ok = await aiController
                                               .confirmTaskCreation(context);
+                                          if (ok && context.mounted) {
+                                            TaskCreatedOverlay.show(context);
+                                          }
                                         }
                                       },
                                       child: const Text("Choose list"),

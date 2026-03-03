@@ -254,6 +254,37 @@ class AIController extends ChangeNotifier {
     return DateTime(base.year, base.month, base.day, hour, minute);
   }
 
+  /* ───────────────────────── TITLE EXTRACTOR ───────────────────────── */
+
+  /// Extracts the actual task name from freeform user input.
+  String _extractTaskTitle(String input) {
+    var title = input
+        .replaceAll(
+          RegExp(
+            r'\b(add a task to|remind me to|create a task to|set a reminder to|add a task|create a task|add|task:?)\b',
+            caseSensitive: false,
+          ),
+          ' ',
+        )
+        .replaceAll(
+          RegExp(r'\bat\s+\d{1,2}(:\d{2})?\s*(am|pm)?\b', caseSensitive: false),
+          ' ',
+        )
+        .replaceAll(
+          RegExp(
+            r'\b(today|tomorrow|tonight|morning|afternoon|evening|night)\b',
+            caseSensitive: false,
+          ),
+          ' ',
+        )
+        .replaceAll(RegExp(r'\s{2,}'), ' ')
+        .trim();
+    if (title.isNotEmpty) {
+      title = title[0].toUpperCase() + title.substring(1);
+    }
+    return title.isEmpty ? input.trim() : title;
+  }
+
   /* ───────────────────────── GEMINI ───────────────────────── */
 
   Future<void> sendMessage(String userInput) async {
@@ -306,8 +337,7 @@ class AIController extends ChangeNotifier {
                   "3. ⚠️ TASK CREATION — MANDATORY FORMAT:\n"
                   "   If the user wants to ADD or CREATE a task, you MUST respond with EXACTLY this "
                   "format and NOTHING else — no explanation, no extra text:\n"
-                  "   ADD_TASK:{title}|{dueDateISO}|{priority}|{notes}|{repeat}\n"
-                  "   Example: ADD_TASK:Buy milk|2026-03-04T09:00:00|medium||null\n"
+                  "   ADD_TASK:{title}|{dueDateISO}|{priority}|{notes}|{repeat}\n\n"
                   "   Priority must be: low, medium, or high.\n"
                   "   dueDateISO must be in IST (UTC+05:30) in ISO 8601 format.\n"
                   "   Leave notes/repeat empty if not mentioned.\n"
@@ -319,7 +349,10 @@ class AIController extends ChangeNotifier {
         {
           "role": "model",
           "parts": [
-            {"text": "Understood! I'll use ADD_TASK format strictly for task creation."},
+            {
+              "text":
+                  "Understood! I will only use the ADD_TASK: format for task creation, never plain text.",
+            },
           ],
         },
       ];
@@ -360,13 +393,13 @@ class AIController extends ChangeNotifier {
         body: jsonEncode(requestBody),
       );
 
-      // 🔴 Gemini unavailable → fallback
+      // 🔴 Gemini error handling
       if (response.statusCode != 200) {
         if (looksLikeTask(userInput)) {
           final istDue = inferDueDateIST(userInput);
 
           pendingTaskToCreate = {
-            "title": userInput.split(" at ").first.trim(),
+            "title": _extractTaskTitle(userInput),
             "dueDateIST": istDue,
             "dueDateUTC": istDue != null ? toUtcIso(istDue) : null,
             "priority": "medium",
@@ -383,7 +416,7 @@ class AIController extends ChangeNotifier {
           );
         } else {
           addMessage(
-            "Sorry, I'm having trouble right now 😕",
+            "❌ AI error (status ${response.statusCode}). Please try again.",
             MessageRole.assistant,
           );
         }
@@ -399,6 +432,8 @@ class AIController extends ChangeNotifier {
       } else {
         addMessage(aiReply.trim(), MessageRole.assistant);
       }
+    } catch (e) {
+      addMessage("❌ Something went wrong. Please try again.", MessageRole.assistant);
     } finally {
       isLoading = false;
       notifyListeners();
@@ -436,8 +471,8 @@ class AIController extends ChangeNotifier {
 
   /* ───────────────────────── CONFIRM ───────────────────────── */
 
-  Future<void> confirmTaskCreation(BuildContext context) async {
-    if (pendingTaskToCreate == null) return;
+  Future<bool> confirmTaskCreation(BuildContext context) async {
+    if (pendingTaskToCreate == null) return false;
 
     final success = await _createTaskOnBackend(pendingTaskToCreate!);
 
@@ -450,6 +485,7 @@ class AIController extends ChangeNotifier {
 
     pendingTaskToCreate = null;
     notifyListeners();
+    return success;
   }
 
   /* ───────────────────────── BACKEND ───────────────────────── */
