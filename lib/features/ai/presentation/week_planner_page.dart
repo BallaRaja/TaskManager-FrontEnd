@@ -27,6 +27,7 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
     super.initState();
     final now = DateTime.now();
     _weekStart = DateTime(now.year, now.month, now.day);
+    debugPrint('📍 [WeekPlannerPage] initState: _weekStart=$_weekStart');
 
     _fadeCtrl = AnimationController(
       vsync: this,
@@ -38,11 +39,14 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
   }
 
   Future<void> _init() async {
+    debugPrint('📍 [WeekPlannerPage] _init() loading tasks & lists...');
     await _planner.loadTasksAndLists();
+    debugPrint('📍 [WeekPlannerPage] _init() done, mounted=$mounted');
     if (mounted) setState(() => _loading = false);
   }
 
   void _onPlannerUpdate() {
+    debugPrint('📍 [WeekPlannerPage] _onPlannerUpdate: isGenerating=${_planner.isGenerating}, tasks=${_planner.generatedTasks.length}, error=${_planner.errorMessage}');
     if (mounted) setState(() {});
     if (_planner.generatedTasks.isNotEmpty) _fadeCtrl.forward(from: 0);
   }
@@ -100,6 +104,7 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
 
   void _generate() {
     final prompt = _promptCtrl.text.trim();
+    debugPrint('📍 [WeekPlannerPage] _generate() prompt="$prompt", weekStart=$_weekStart');
     if (prompt.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -111,6 +116,7 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
   }
 
   void _confirmUpload() async {
+    debugPrint('📍 [WeekPlannerPage] _confirmUpload() called');
     final ok = await _planner.confirmAndUpload();
     if (!mounted) return;
     if (ok) {
@@ -259,11 +265,12 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
                       children: [
                         Row(
                           children: [
-                            const _SectionLabel(
-                              'Your Week Plan',
-                              icon: Icons.date_range_rounded,
+                            const Expanded(
+                              child: _SectionLabel(
+                                'Your Week Plan',
+                                icon: Icons.date_range_rounded,
+                              ),
                             ),
-                            const Spacer(),
                             Text(
                               '${_planner.generatedTasks.length} tasks',
                               style: TextStyle(

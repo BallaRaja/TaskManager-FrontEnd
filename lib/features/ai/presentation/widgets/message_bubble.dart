@@ -173,6 +173,11 @@ class MessageBubble extends StatelessWidget {
                   backgroundImage: (userAvatarUrl != null)
                       ? NetworkImage(userAvatarUrl!) as ImageProvider
                       : null,
+                  onBackgroundImageError: (_, __) {
+                    if (userAvatarUrl != null) {
+                      imageCache.evict(NetworkImage(userAvatarUrl!));
+                    }
+                  },
                   child: userAvatarUrl == null
                       ? const Icon(Icons.person, size: 20, color: Colors.white)
                       : null,

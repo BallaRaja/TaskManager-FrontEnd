@@ -1123,6 +1123,12 @@ class _TasksPageState extends State<TasksPage> {
                                 !controller.avatarUrl!.contains('placeholder')
                             ? NetworkImage(controller.avatarUrl!)
                             : null,
+                        onBackgroundImageError: (_, __) {
+                          // Silently handle 404/network errors to prevent retry spam
+                          if (controller.avatarUrl != null) {
+                            imageCache.evict(NetworkImage(controller.avatarUrl!));
+                          }
+                        },
                         child: controller.isLoadingAvatar
                             ? const SizedBox(
                                 width: 20,

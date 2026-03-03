@@ -56,33 +56,55 @@ class AIPlannerController extends ChangeNotifier {
      ══════════════════════════════════════════════════════════════════ */
 
   Future<void> loadTasksAndLists() async {
+    debugPrint('🔵 [AIPlannerCtrl] loadTasksAndLists() called');
     final token = await SessionManager.getToken();
     final userId = await SessionManager.getUserId();
-    if (token == null || userId == null) return;
+    debugPrint('🔵 [AIPlannerCtrl] token=${token != null ? 'present' : 'NULL'}, userId=$userId');
+    if (token == null || userId == null) {
+      debugPrint('❌ [AIPlannerCtrl] token or userId is null, aborting load');
+      return;
+    }
 
     // Fetch tasks
-    final taskRes = await http.get(
-      Uri.parse('$_backendUrl/api/task/$userId'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
-    if (taskRes.statusCode == 200) {
-      _allTasks =
-          List<Map<String, dynamic>>.from(jsonDecode(taskRes.body)['data'] ?? []);
+    try {
+      final taskRes = await http.get(
+        Uri.parse('$_backendUrl/api/task/$userId'),
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      debugPrint('🔵 [AIPlannerCtrl] Fetch tasks status: ${taskRes.statusCode}');
+      if (taskRes.statusCode == 200) {
+        _allTasks =
+            List<Map<String, dynamic>>.from(jsonDecode(taskRes.body)['data'] ?? []);
+        debugPrint('🔵 [AIPlannerCtrl] Loaded ${_allTasks.length} tasks');
+      } else {
+        debugPrint('❌ [AIPlannerCtrl] Fetch tasks failed: ${taskRes.statusCode} - ${taskRes.body}');
+      }
+    } catch (e, st) {
+      debugPrint('❌ [AIPlannerCtrl] Fetch tasks exception: $e\n$st');
     }
 
     // Fetch task lists → find default
-    final listRes = await http.get(
-      Uri.parse('$_backendUrl/api/taskList/$userId'),
-      headers: {'Authorization': 'Bearer $token'},
-    );
-    if (listRes.statusCode == 200) {
-      final lists =
-          List<Map<String, dynamic>>.from(jsonDecode(listRes.body)['data'] ?? []);
-      final def = lists.firstWhere(
-        (l) => l['isDefault'] == true,
-        orElse: () => lists.isNotEmpty ? lists.first : <String, dynamic>{},
+    try {
+      final listRes = await http.get(
+        Uri.parse('$_backendUrl/api/taskList/$userId'),
+        headers: {'Authorization': 'Bearer $token'},
       );
-      _defaultListId = def['_id']?.toString();
+      debugPrint('🔵 [AIPlannerCtrl] Fetch lists status: ${listRes.statusCode}');
+      if (listRes.statusCode == 200) {
+        final lists =
+            List<Map<String, dynamic>>.from(jsonDecode(listRes.body)['data'] ?? []);
+        debugPrint('🔵 [AIPlannerCtrl] Loaded ${lists.length} task lists');
+        final def = lists.firstWhere(
+          (l) => l['isDefault'] == true,
+          orElse: () => lists.isNotEmpty ? lists.first : <String, dynamic>{},
+        );
+        _defaultListId = def['_id']?.toString();
+        debugPrint('🔵 [AIPlannerCtrl] Default list ID: $_defaultListId');
+      } else {
+        debugPrint('❌ [AIPlannerCtrl] Fetch lists failed: ${listRes.statusCode} - ${listRes.body}');
+      }
+    } catch (e, st) {
+      debugPrint('❌ [AIPlannerCtrl] Fetch lists exception: $e\n$st');
     }
   }
 
@@ -162,15 +184,20 @@ class AIPlannerController extends ChangeNotifier {
           "8. Ensure times don't overlap and are in chronological order.\n";
 
       final result = await _callGemini(prompt);
+      debugPrint('🟢 [AIPlannerCtrl]   Gemini result: ${result == null ? 'NULL' : '${result.length} chars'}');
       if (result == null) {
+        debugPrint('❌ [AIPlannerCtrl]   AI returned null — service unavailable');
         errorMessage = 'AI service unavailable. Please try again.';
         isGenerating = false;
         notifyListeners();
         return;
       }
+      debugPrint('🟢 [AIPlannerCtrl]   Raw AI response (first 500 chars): ${result.substring(0, result.length > 500 ? 500 : result.length)}');
 
       _parseTasks(result, date);
-    } catch (e) {
+      debugPrint('🟢 [AIPlannerCtrl]   After parse: ${generatedTasks.length} tasks, error=$errorMessage');
+    } catch (e, st) {
+      debugPrint('❌ [AIPlannerCtrl]   generateDayPlan EXCEPTION: $e\n$st');
       errorMessage = 'Something went wrong. Please try again.';
     }
 
@@ -183,6 +210,8 @@ class AIPlannerController extends ChangeNotifier {
      ══════════════════════════════════════════════════════════════════ */
 
   Future<void> generateWeekPlan(DateTime startDate, String userPrompt) async {
+    debugPrint('🟣 [AIPlannerCtrl] generateWeekPlan() called');
+    debugPrint('🟣 [AIPlannerCtrl]   startDate=$startDate, prompt="$userPrompt"');
     isGenerating = true;
     errorMessage = null;
     generatedTasks = [];
@@ -190,11 +219,13 @@ class AIPlannerController extends ChangeNotifier {
 
     try {
       final existingTasks = tasksForWeek(startDate);
+      debugPrint('🟣 [AIPlannerCtrl]   existing tasks for week: ${existingTasks.length}');
       final ctx = _taskContextFor(existingTasks);
       final startStr = DateFormat('EEEE, d MMM yyyy').format(startDate);
       final endDate = startDate.add(const Duration(days: 6));
       final endStr = DateFormat('EEEE, d MMM yyyy').format(endDate);
       final nowStr = _formatLocal(nowLocal());
+      debugPrint('🟣 [AIPlannerCtrl]   week: $startStr → $endStr, now: $nowStr');
 
       final prompt =
           "You are an AI week planner.\n\n"
@@ -216,15 +247,20 @@ class AIPlannerController extends ChangeNotifier {
           "10. Sort by date then time.\n";
 
       final result = await _callGemini(prompt);
+      debugPrint('🟣 [AIPlannerCtrl]   Gemini result: ${result == null ? 'NULL' : '${result.length} chars'}');
       if (result == null) {
+        debugPrint('❌ [AIPlannerCtrl]   AI returned null — service unavailable');
         errorMessage = 'AI service unavailable. Please try again.';
         isGenerating = false;
         notifyListeners();
         return;
       }
+      debugPrint('🟣 [AIPlannerCtrl]   Raw AI response (first 500 chars): ${result.substring(0, result.length > 500 ? 500 : result.length)}');
 
       _parseWeekTasks(result, startDate);
-    } catch (e) {
+      debugPrint('🟣 [AIPlannerCtrl]   After parse: ${generatedTasks.length} tasks, error=$errorMessage');
+    } catch (e, st) {
+      debugPrint('❌ [AIPlannerCtrl]   generateWeekPlan EXCEPTION: $e\n$st');
       errorMessage = 'Something went wrong. Please try again.';
     }
 
@@ -237,30 +273,42 @@ class AIPlannerController extends ChangeNotifier {
      ══════════════════════════════════════════════════════════════════ */
 
   Future<String?> _callGemini(String prompt) async {
+    debugPrint('🌐 [AIPlannerCtrl] _callGemini() sending request...');
     final uri = Uri.parse(
       'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=$_apiKey',
     );
 
-    final response = await http.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'contents': [
-          {
-            'role': 'user',
-            'parts': [
-              {'text': prompt}
-            ],
-          }
-        ],
-        'generationConfig': {'temperature': 0.4, 'maxOutputTokens': 2048},
-      }),
-    );
+    try {
+      final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'contents': [
+            {
+              'role': 'user',
+              'parts': [
+                {'text': prompt}
+              ],
+            }
+          ],
+          'generationConfig': {'temperature': 0.4, 'maxOutputTokens': 8192},
+        }),
+      );
 
-    if (response.statusCode != 200) return null;
+      debugPrint('🌐 [AIPlannerCtrl] Gemini response status: ${response.statusCode}');
+      if (response.statusCode != 200) {
+        debugPrint('❌ [AIPlannerCtrl] Gemini error body: ${response.body}');
+        return null;
+      }
 
-    final data = jsonDecode(response.body);
-    return data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
+      final data = jsonDecode(response.body);
+      final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
+      debugPrint('🌐 [AIPlannerCtrl] Gemini extracted text: ${text == null ? 'NULL' : '${text.length} chars'}');
+      return text;
+    } catch (e, st) {
+      debugPrint('❌ [AIPlannerCtrl] _callGemini EXCEPTION: $e\n$st');
+      return null;
+    }
   }
 
   /* ══════════════════════════════════════════════════════════════════
@@ -269,7 +317,22 @@ class AIPlannerController extends ChangeNotifier {
 
   void _parseTasks(String raw, DateTime date) {
     try {
-      final jsonMatch = RegExp(r'\[.*\]', dotAll: true).firstMatch(raw);
+      // Strip markdown code fences (```json ... ```)
+      String cleaned = raw.replaceAll(RegExp(r'```(?:json)?\s*', caseSensitive: false), '').trim();
+
+      var jsonMatch = RegExp(r'\[.*\]', dotAll: true).firstMatch(cleaned);
+
+      // Handle truncated JSON: find '[' but no closing ']'
+      if (jsonMatch == null && cleaned.contains('[')) {
+        final startIdx = cleaned.indexOf('[');
+        String partial = cleaned.substring(startIdx);
+        final lastBrace = partial.lastIndexOf('}');
+        if (lastBrace > 0) {
+          partial = '${partial.substring(0, lastBrace + 1)}]';
+          jsonMatch = RegExp(r'\[.*\]', dotAll: true).firstMatch(partial);
+        }
+      }
+
       if (jsonMatch == null) {
         errorMessage = 'AI returned an unexpected format. Try again.';
         return;
@@ -292,30 +355,63 @@ class AIPlannerController extends ChangeNotifier {
   }
 
   void _parseWeekTasks(String raw, DateTime startDate) {
+    debugPrint('🔧 [AIPlannerCtrl] _parseWeekTasks() called, raw length=${raw.length}');
     try {
-      final jsonMatch = RegExp(r'\[.*\]', dotAll: true).firstMatch(raw);
+      // Strip markdown code fences (```json ... ```)
+      String cleaned = raw.replaceAll(RegExp(r'```(?:json)?\s*', caseSensitive: false), '').trim();
+      debugPrint('🔧 [AIPlannerCtrl] After stripping fences: ${cleaned.length} chars');
+
+      var jsonMatch = RegExp(r'\[.*\]', dotAll: true).firstMatch(cleaned);
+
+      // Handle truncated JSON: if we find '[' but no closing ']'
+      if (jsonMatch == null && cleaned.contains('[')) {
+        debugPrint('🔧 [AIPlannerCtrl] No closing ] found — attempting truncation repair');
+        final startIdx = cleaned.indexOf('[');
+        String partial = cleaned.substring(startIdx);
+        // Find the last complete object by locating the last '}'
+        final lastBrace = partial.lastIndexOf('}');
+        if (lastBrace > 0) {
+          partial = '${partial.substring(0, lastBrace + 1)}]';
+          debugPrint('🔧 [AIPlannerCtrl] Repaired JSON length: ${partial.length}');
+          jsonMatch = RegExp(r'\[.*\]', dotAll: true).firstMatch(partial);
+        }
+      }
+
       if (jsonMatch == null) {
+        debugPrint('❌ [AIPlannerCtrl] No JSON array found in AI response');
+        debugPrint('❌ [AIPlannerCtrl] Raw response: $raw');
         errorMessage = 'AI returned an unexpected format. Try again.';
         return;
       }
-      final List items = jsonDecode(jsonMatch.group(0)!);
-      generatedTasks = items.map((item) {
+      final jsonStr = jsonMatch.group(0)!;
+      debugPrint('🔧 [AIPlannerCtrl] Extracted JSON length: ${jsonStr.length}');
+      final List items = jsonDecode(jsonStr);
+      debugPrint('🔧 [AIPlannerCtrl] Parsed ${items.length} items from JSON');
+      generatedTasks = items.asMap().entries.map((entry) {
+        final i = entry.key;
+        final item = entry.value;
+        debugPrint('🔧 [AIPlannerCtrl]   Item[$i]: $item');
         final dateStr = item['date'] as String? ??
             DateFormat('yyyy-MM-dd').format(startDate);
         final parsed = DateTime.tryParse(dateStr) ?? startDate;
         final timeParts = (item['time'] as String? ?? '09:00').split(':');
         final hour = int.tryParse(timeParts[0]) ?? 9;
         final minute = timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
+        final dueDate = DateTime(parsed.year, parsed.month, parsed.day, hour, minute);
+        debugPrint('🔧 [AIPlannerCtrl]   → title="${item['title']}", dueDate=$dueDate, priority=${item['priority']}');
         return PlannedTask(
           title: item['title'] ?? 'Untitled',
-          dueDate: DateTime(parsed.year, parsed.month, parsed.day, hour, minute),
+          dueDate: dueDate,
           priority: item['priority'] ?? 'medium',
           notes: item['notes'] ?? '',
         );
       }).toList();
       // Sort by date/time
       generatedTasks.sort((a, b) => a.dueDate.compareTo(b.dueDate));
-    } catch (_) {
+      debugPrint('🔧 [AIPlannerCtrl] Final sorted tasks: ${generatedTasks.length}');
+    } catch (e, st) {
+      debugPrint('❌ [AIPlannerCtrl] _parseWeekTasks EXCEPTION: $e\n$st');
+      debugPrint('❌ [AIPlannerCtrl] Raw was: $raw');
       errorMessage = 'Failed to parse AI response. Try again.';
     }
   }
@@ -343,7 +439,12 @@ class AIPlannerController extends ChangeNotifier {
      ══════════════════════════════════════════════════════════════════ */
 
   Future<bool> confirmAndUpload() async {
-    if (generatedTasks.isEmpty || _defaultListId == null) return false;
+    debugPrint('🚀 [AIPlannerCtrl] confirmAndUpload() called');
+    debugPrint('🚀 [AIPlannerCtrl]   tasks=${generatedTasks.length}, defaultListId=$_defaultListId');
+    if (generatedTasks.isEmpty || _defaultListId == null) {
+      debugPrint('❌ [AIPlannerCtrl] Aborting upload: tasks empty=${generatedTasks.isEmpty}, listId null=${_defaultListId == null}');
+      return false;
+    }
 
     isUploading = true;
     notifyListeners();
@@ -351,13 +452,15 @@ class AIPlannerController extends ChangeNotifier {
     final token = await SessionManager.getToken();
     final userId = await SessionManager.getUserId();
     if (token == null || userId == null) {
+      debugPrint('❌ [AIPlannerCtrl] Aborting upload: token or userId null');
       isUploading = false;
       notifyListeners();
       return false;
     }
 
     int successCount = 0;
-    for (final task in generatedTasks) {
+    for (int i = 0; i < generatedTasks.length; i++) {
+      final task = generatedTasks[i];
       final payload = {
         'userId': userId,
         'taskListId': _defaultListId,
@@ -371,6 +474,7 @@ class AIPlannerController extends ChangeNotifier {
         'repeat': null,
       };
 
+      debugPrint('🚀 [AIPlannerCtrl]   Uploading task[$i]: "${task.title}" due=${task.dueDate} → UTC=${task.dueDate.toUtc().toIso8601String()}');
       try {
         final res = await http.post(
           Uri.parse('$_backendUrl/api/task'),
@@ -380,12 +484,20 @@ class AIPlannerController extends ChangeNotifier {
           },
           body: jsonEncode(payload),
         );
-        if (res.statusCode == 200 || res.statusCode == 201) successCount++;
-      } catch (_) {}
+        debugPrint('🚀 [AIPlannerCtrl]   Task[$i] upload status: ${res.statusCode}');
+        if (res.statusCode == 200 || res.statusCode == 201) {
+          successCount++;
+        } else {
+          debugPrint('❌ [AIPlannerCtrl]   Task[$i] upload failed: ${res.body}');
+        }
+      } catch (e, st) {
+        debugPrint('❌ [AIPlannerCtrl]   Task[$i] upload EXCEPTION: $e\n$st');
+      }
     }
 
     isUploading = false;
     final allOk = successCount == generatedTasks.length;
+    debugPrint('🚀 [AIPlannerCtrl] Upload complete: $successCount/${generatedTasks.length} succeeded, allOk=$allOk');
     if (allOk) generatedTasks.clear();
     notifyListeners();
     return allOk;

@@ -257,6 +257,11 @@ class _ProfileSheetState extends State<ProfileSheet> {
             backgroundImage: hasAvatar && fullAvatarUrl != null
                 ? NetworkImage(fullAvatarUrl)
                 : null,
+            onBackgroundImageError: (_, __) {
+              if (fullAvatarUrl != null) {
+                imageCache.evict(NetworkImage(fullAvatarUrl));
+              }
+            },
             backgroundColor: Colors.grey[300],
             child: !hasAvatar
                 ? Icon(Icons.person, size: 50, color: Colors.grey[600])

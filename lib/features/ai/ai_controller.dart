@@ -399,21 +399,21 @@ class AIController extends ChangeNotifier {
       // 🔴 Gemini error handling
       if (response.statusCode != 200) {
         if (looksLikeTask(userInput)) {
-          final istDue = inferDueDateIST(userInput);
+          final localDue = inferDueDateIST(userInput);
 
           pendingTaskToCreate = {
             "title": _extractTaskTitle(userInput),
-            "dueDateIST": istDue,
-            "dueDateUTC": istDue != null ? toUtcIso(istDue) : null,
+            "dueDateLocal": localDue,
+            "dueDateUTC": localDue != null ? toUtcIso(localDue) : null,
             "priority": "medium",
             "notes": "",
             "repeat": null,
-          };
+          };    
 
           addMessage(
             "I understood this as a task:\n\n"
             "📌 ${pendingTaskToCreate!["title"]}\n"
-            "${istDue != null ? "📅 ${formatForDisplay(istDue)}\n" : ""}"
+            "${localDue != null ? "📅 ${formatForDisplay(localDue)}\n" : ""}"
             "\nTap below to confirm →",
             MessageRole.assistant,
           );
@@ -452,12 +452,14 @@ class AIController extends ChangeNotifier {
       return;
     }
 
-    final istDue = DateTime.tryParse(parts[1].trim());
+    // Parse and always convert to local time for display
+    final parsed = DateTime.tryParse(parts[1].trim());
+    final localDue = parsed?.toLocal();
 
     pendingTaskToCreate = {
       "title": parts[0].trim(),
-      "dueDateIST": istDue,
-      "dueDateUTC": istDue != null ? toUtcIso(istDue) : null,
+      "dueDateLocal": localDue,
+      "dueDateUTC": localDue != null ? localDue.toUtc().toIso8601String() : null,
       "priority": parts[2].trim().isEmpty ? "medium" : parts[2].trim(),
       "notes": parts[3].trim(),
       "repeat": parts[4].trim().isEmpty ? null : parts[4].trim(),
@@ -466,7 +468,7 @@ class AIController extends ChangeNotifier {
     addMessage(
       "I can add this task for you:\n\n"
       "📌 ${pendingTaskToCreate!["title"]}\n"
-      "${istDue != null ? "📅 ${formatForDisplay(istDue)}\n" : ""}"
+      "${localDue != null ? "📅 ${formatForDisplay(localDue)}\n" : ""}"
       "\nTap below to confirm →",
       MessageRole.assistant,
     );
