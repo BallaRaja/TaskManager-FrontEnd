@@ -234,7 +234,17 @@ class TaskItem extends StatelessWidget {
         body: jsonEncode({"isArchived": true}),
       );
       if (response.statusCode == 200) {
-        _removeLocalTask(context);
+        // Update the local task's isArchived flag so it moves to Archived view
+        // immediately without needing a full refresh.
+        final updatedTask = Map<String, dynamic>.from(task);
+        updatedTask["isArchived"] = true;
+        final tasksCtrl = Provider.of<TasksController>(context, listen: false);
+        final calendarCtrl = Provider.of<CalendarController>(
+          context,
+          listen: false,
+        );
+        tasksCtrl.upsertTaskLocal(updatedTask);
+        calendarCtrl.upsertTaskLocal(updatedTask);
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -267,7 +277,17 @@ class TaskItem extends StatelessWidget {
         body: jsonEncode({"isArchived": false}),
       );
       if (response.statusCode == 200) {
-        _removeLocalTask(context);
+        // Update the local task's isArchived flag so it moves back to its list view
+        // immediately without needing a full refresh.
+        final updatedTask = Map<String, dynamic>.from(task);
+        updatedTask["isArchived"] = false;
+        final tasksCtrl = Provider.of<TasksController>(context, listen: false);
+        final calendarCtrl = Provider.of<CalendarController>(
+          context,
+          listen: false,
+        );
+        tasksCtrl.upsertTaskLocal(updatedTask);
+        calendarCtrl.upsertTaskLocal(updatedTask);
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(

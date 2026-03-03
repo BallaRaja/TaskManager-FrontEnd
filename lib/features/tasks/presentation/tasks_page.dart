@@ -130,7 +130,10 @@ class _TasksPageState extends State<TasksPage> {
     final String listId = listData['_id'].toString();
     final String listTitle = listData['title']?.toString() ?? 'Untitled';
     final int taskCount = controller.tasks
-        .where((t) => t['taskListId']?.toString() == listId)
+        .where(
+          (t) =>
+              t['taskListId']?.toString() == listId && t['isArchived'] != true,
+        )
         .length;
 
     showModalBottomSheet(
@@ -505,7 +508,8 @@ class _TasksPageState extends State<TasksPage> {
                         .where(
                           (t) =>
                               t['taskListId']?.toString() == listId &&
-                              t['status'] != 'completed',
+                              t['status'] != 'completed' &&
+                              t['isArchived'] != true,
                         )
                         .length;
                     final bool isDefault = list['isDefault'] == true;
@@ -942,14 +946,19 @@ class _TasksPageState extends State<TasksPage> {
         if (currentList["isDefault"] != true) {
           activeList = currentList;
           displayedTasks = controller.tasks
-              .where((task) => task["taskListId"]?.toString() == currentListId)
+              .where(
+                (task) =>
+                    task["taskListId"]?.toString() == currentListId &&
+                    task["isArchived"] != true,
+              )
               .toList();
         } else {
-          // Default "My Tasks" list → show only tasks due today
+          // Default "My Tasks" list → show only tasks due today (not archived)
           isDefaultList = true;
           final now = DateTime.now();
           final today = DateTime(now.year, now.month, now.day);
           displayedTasks = controller.tasks.where((task) {
+            if (task["isArchived"] == true) return false;
             final dueStr = task['dueDate'] as String?;
             if (dueStr == null || dueStr.isEmpty) return false;
             final due = DateTime.tryParse(dueStr)?.toLocal();
@@ -961,7 +970,9 @@ class _TasksPageState extends State<TasksPage> {
       }
     } else if (_viewType == TaskViewType.starred) {
       displayedTasks = controller.tasks
-          .where((task) => task["priority"] == "high")
+          .where(
+            (task) => task["priority"] == "high" && task["isArchived"] != true,
+          )
           .toList();
     } else if (_viewType == TaskViewType.archived) {
       displayedTasks = controller.tasks
