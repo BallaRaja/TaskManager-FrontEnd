@@ -22,8 +22,8 @@ class AIController extends ChangeNotifier {
   /// Task waiting for user confirmation
   Map<String, dynamic>? pendingTaskToCreate;
 
-  /// IST offset (fixed for India)
-  static const Duration istOffset = Duration(hours: 5, minutes: 30);
+  /// System timezone name for prompt context
+  static final String _tzLabel = DateTime.now().timeZoneName;
 
   static const String _chatKey = 'ai_chat_messages';
   static const String _suggestionsKey = 'ai_suggestions';
@@ -103,7 +103,7 @@ class AIController extends ChangeNotifier {
 
     try {
       final taskContext = await _fetchTaskContext();
-      final istNow = nowIST();
+      final now = nowLocal();
 
       final uri = Uri.parse(
         "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=$apiKey",
@@ -120,7 +120,7 @@ class AIController extends ChangeNotifier {
                     "Based on the user's current tasks and the time, generate exactly 4 short, "
                     "helpful suggestion chip labels (max 6 words each) that the user might want to ask. "
                     "Return ONLY a JSON array of 4 strings, no explanation, no markdown.\n\n"
-                    "Current IST time: ${DateFormat('EEE d MMM, h:mm a').format(istNow)}\n"
+                    "Current time ($_tzLabel): ${DateFormat('EEE d MMM, h:mm a').format(now)}\n"
                     "Current tasks:\n$taskContext",
               },
             ],
@@ -188,19 +188,22 @@ class AIController extends ChangeNotifier {
 
   /* ───────────────────────── TIME HELPERS ───────────────────────── */
 
-  /// Current IST time (authoritative)
-  DateTime nowIST() {
-    return DateTime.now().toUtc().add(istOffset);
+  /// Current local time (uses system timezone)
+  DateTime nowLocal() {
+    return DateTime.now();
   }
 
-  /// Convert IST → UTC ISO for backend
-  String toUtcIso(DateTime istTime) {
-    return istTime.subtract(istOffset).toIso8601String();
+  // Keep old name as alias so callers still work
+  DateTime nowIST() => nowLocal();
+
+  /// Convert local time → UTC ISO for backend
+  String toUtcIso(DateTime localTime) {
+    return localTime.toUtc().toIso8601String();
   }
 
-  /// Pretty display for confirmation (IST)
-  String formatForDisplay(DateTime istTime) {
-    return DateFormat("EEE, d MMM yyyy 'at' h:mm a").format(istTime);
+  /// Pretty display for confirmation (local time)
+  String formatForDisplay(DateTime localTime) {
+    return DateFormat("EEE, d MMM yyyy 'at' h:mm a").format(localTime);
   }
 
   bool looksLikeTask(String input) {
@@ -306,13 +309,11 @@ class AIController extends ChangeNotifier {
     try {
       final taskContext = await _fetchTaskContext();
 
-      final istNow = nowIST();
-      final istNowStr = DateFormat(
-        "EEE, d MMM yyyy 'at' h:mm a",
-      ).format(istNow);
-      final tomorrowStr = DateFormat(
-        "EEE, d MMM yyyy",
-      ).format(istNow.add(const Duration(days: 1)));
+      final now = nowLocal();
+      final nowStr = DateFormat("EEE, d MMM yyyy 'at' h:mm a").format(now);
+      final tomorrowStr = DateFormat("EEE, d MMM yyyy").format(
+        now.add(const Duration(days: 1)),
+      );
 
       final uri = Uri.parse(
         "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=$apiKey",
@@ -327,8 +328,8 @@ class AIController extends ChangeNotifier {
           "parts": [
             {
               "text":
-                  "You are a helpful task management AI assistant for Indian users.\n\n"
-                  "CURRENT IST DATE & TIME: $istNowStr (UTC+05:30)\n"
+                  "You are a helpful task management AI assistant.\n\n"
+                  "CURRENT DATE & TIME ($_tzLabel): $nowStr\n"
                   "TOMORROW IS: $tomorrowStr\n\n"
                   "TIME RULES:\n"
                   "- morning = 5:00 AM – 11:59 AM\n"
@@ -345,12 +346,7 @@ class AIController extends ChangeNotifier {
                   "format and NOTHING else — no explanation, no extra text:\n"
                   "   ADD_TASK:{title}|{dueDateISO}|{priority}|{notes}|{repeat}\n\n"
                   "   Priority must be: low, medium, or high.\n"
-                  "   dueDateISO: Use ISO 8601 format WITH +05:30 offset (e.g. 2026-03-04T01:10:00+05:30).\n"
-                  "   ⚠️ CRITICAL TIME RULES:\n"
-                  "   - If the user mentions an EXACT time (e.g. '1:10 am', '3:30 pm'), use that EXACT time. Do NOT change it.\n"
-                  "   - 'today' means the CURRENT IST DATE shown above. Do NOT use yesterday or any other date.\n"
-                  "   - 'tomorrow' means the TOMORROW IS date shown above.\n"
-                  "   - Respect AM/PM exactly as stated (1:10 am → T01:10:00, 1:10 pm → T13:10:00).\n"
+                  "   dueDateISO must be in the user's local time in ISO 8601 format.\n"
                   "   Leave notes/repeat empty if not mentioned.\n"
                   "4. For all other queries (listing, counting, advice), reply in plain friendly text.",
             },
@@ -416,21 +412,21 @@ class AIController extends ChangeNotifier {
       // 🔴 Gemini error handling
       if (response.statusCode != 200) {
         if (looksLikeTask(userInput)) {
-          final istDue = inferDueDateIST(userInput);
+          final localDue = inferDueDateIST(userInput);
 
           pendingTaskToCreate = {
             "title": _extractTaskTitle(userInput),
-            "dueDateIST": istDue,
-            "dueDateUTC": istDue != null ? toUtcIso(istDue) : null,
+            "dueDateLocal": localDue,
+            "dueDateUTC": localDue != null ? toUtcIso(localDue) : null,
             "priority": "medium",
             "notes": "",
             "repeat": null,
-          };
+          };    
 
           addMessage(
             "I understood this as a task:\n\n"
             "📌 ${pendingTaskToCreate!["title"]}\n"
-            "${istDue != null ? "📅 ${formatForDisplay(istDue)}\n" : ""}"
+            "${localDue != null ? "📅 ${formatForDisplay(localDue)}\n" : ""}"
             "\nTap below to confirm →",
             MessageRole.assistant,
           );
@@ -472,16 +468,14 @@ class AIController extends ChangeNotifier {
       return;
     }
 
-    // Gemini returns ISO date with +05:30 offset (e.g. 2026-03-04T01:10:00+05:30).
-    // DateTime.tryParse converts that to UTC internally, so we add the IST offset
-    // back to get the correct IST datetime for display and confirmation.
-    final parsedDue = DateTime.tryParse(parts[1].trim());
-    final istDue = parsedDue != null ? parsedDue.toUtc().add(istOffset) : null;
+    // Parse and always convert to local time for display
+    final parsed = DateTime.tryParse(parts[1].trim());
+    final localDue = parsed?.toLocal();
 
     pendingTaskToCreate = {
       "title": parts[0].trim(),
-      "dueDateIST": istDue,
-      "dueDateUTC": istDue != null ? toUtcIso(istDue) : null,
+      "dueDateLocal": localDue,
+      "dueDateUTC": localDue != null ? localDue.toUtc().toIso8601String() : null,
       "priority": parts[2].trim().isEmpty ? "medium" : parts[2].trim(),
       "notes": parts[3].trim(),
       "repeat": parts[4].trim().isEmpty ? null : parts[4].trim(),
@@ -490,7 +484,7 @@ class AIController extends ChangeNotifier {
     addMessage(
       "I can add this task for you:\n\n"
       "📌 ${pendingTaskToCreate!["title"]}\n"
-      "${istDue != null ? "📅 ${formatForDisplay(istDue)}\n" : ""}"
+      "${localDue != null ? "📅 ${formatForDisplay(localDue)}\n" : ""}"
       "\nTap below to confirm →",
       MessageRole.assistant,
     );
@@ -564,7 +558,7 @@ class AIController extends ChangeNotifier {
     final List tasks = jsonDecode(res.body)["data"] ?? [];
     if (tasks.isEmpty) return "No tasks.";
 
-    final istNow = nowIST();
+    final now = nowLocal();
 
     return tasks
         .map((t) {
@@ -573,34 +567,24 @@ class AIController extends ChangeNotifier {
           final priority = t["priority"] ?? "medium";
           final notes = (t["notes"] ?? "").toString().trim();
 
-          // Convert UTC dueDate → IST for display
-          String dueDateStr = "No due date";
-          if (t["dueDate"] != null && t["dueDate"].toString().isNotEmpty) {
-            final utcDate = DateTime.tryParse(t["dueDate"].toString());
-            if (utcDate != null) {
-              final istDate = utcDate.toUtc().add(istOffset);
-              dueDateStr = DateFormat(
-                "EEE, d MMM yyyy 'at' h:mm a",
-              ).format(istDate);
+      // Convert UTC dueDate → local for display
+      String dueDateStr = "No due date";
+      if (t["dueDate"] != null && t["dueDate"].toString().isNotEmpty) {
+        final utcDate = DateTime.tryParse(t["dueDate"].toString());
+        if (utcDate != null) {
+          final localDate = utcDate.toLocal();
+          dueDateStr = DateFormat("EEE, d MMM yyyy 'at' h:mm a").format(localDate);
 
-              // Label relative days for clarity
-              final todayIST = DateTime(istNow.year, istNow.month, istNow.day);
-              final taskDay = DateTime(
-                istDate.year,
-                istDate.month,
-                istDate.day,
-              );
-              final diff = taskDay.difference(todayIST).inDays;
-              if (diff == 0)
-                dueDateStr += " (TODAY)";
-              else if (diff == 1)
-                dueDateStr += " (TOMORROW)";
-              else if (diff == -1)
-                dueDateStr += " (YESTERDAY)";
-              else if (diff < -1)
-                dueDateStr += " (OVERDUE)";
-            }
-          }
+          // Label relative days for clarity
+          final todayLocal = DateTime(now.year, now.month, now.day);
+          final taskDay = DateTime(localDate.year, localDate.month, localDate.day);
+          final diff = taskDay.difference(todayLocal).inDays;
+          if (diff == 0) dueDateStr += " (TODAY)";
+          else if (diff == 1) dueDateStr += " (TOMORROW)";
+          else if (diff == -1) dueDateStr += " (YESTERDAY)";
+          else if (diff < -1) dueDateStr += " (OVERDUE)";
+        }
+      }
 
           final notesPart = notes.isNotEmpty ? " | notes: $notes" : "";
           return "- [$status] $title | due: $dueDateStr | priority: $priority$notesPart";

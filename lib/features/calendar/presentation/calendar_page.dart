@@ -234,6 +234,11 @@ class _CalendarPageState extends State<CalendarPage> {
                               controller.avatarUrl!.isNotEmpty
                           ? NetworkImage(controller.avatarUrl!)
                           : null,
+                      onBackgroundImageError: (_, __) {
+                        if (controller.avatarUrl != null) {
+                          imageCache.evict(NetworkImage(controller.avatarUrl!));
+                        }
+                      },
                       child:
                           controller.avatarUrl == null ||
                               controller.avatarUrl!.isEmpty
