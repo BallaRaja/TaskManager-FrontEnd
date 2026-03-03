@@ -39,8 +39,8 @@ class _TasksPageState extends State<TasksPage> {
     super.initState();
     _viewType = widget.initialViewType;
 
-    // 🔄 Update time every minute
-    _clockTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+    // 🔄 Update time every second (to show seconds)
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       setState(() {
         _now = DateTime.now();
       });
@@ -54,7 +54,7 @@ class _TasksPageState extends State<TasksPage> {
   }
 
   String get _formattedTime {
-    return DateFormat('hh:mm a').format(_now);
+    return DateFormat('hh:mm:ss a').format(_now);
   }
 
   void _showProfileSheet(BuildContext context) async {
@@ -926,260 +926,248 @@ class _TasksPageState extends State<TasksPage> {
   Widget build(BuildContext context) {
     final controller = context.watch<TasksController>();
     if (controller.isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     // === FILTERING LOGIC ===
-          List<Map<String, dynamic>> displayedTasks = controller.tasks;
-          Map<String, dynamic>? activeList; // non-null only for custom lists
-          String? currentListId;
-          bool isDefaultList = false;
+    List<Map<String, dynamic>> displayedTasks = controller.tasks;
+    Map<String, dynamic>? activeList; // non-null only for custom lists
+    String? currentListId;
+    bool isDefaultList = false;
 
-          if (_viewType == TaskViewType.normal) {
-            if (controller.taskLists.isNotEmpty) {
-              final currentList =
-                  controller.taskLists[controller.selectedListIndex];
-              currentListId = currentList['_id']?.toString();
-              if (currentList["isDefault"] != true) {
-                activeList = currentList;
-                displayedTasks = controller.tasks
-                    .where(
-                      (task) => task["taskListId"]?.toString() == currentListId,
-                    )
-                    .toList();
-              } else {
-                // Default "My Tasks" list → show only tasks due today
-                isDefaultList = true;
-                final now = DateTime.now();
-                final today = DateTime(now.year, now.month, now.day);
-                displayedTasks = controller.tasks.where((task) {
-                  final dueStr = task['dueDate'] as String?;
-                  if (dueStr == null || dueStr.isEmpty) return false;
-                  final due = DateTime.tryParse(dueStr)?.toLocal();
-                  if (due == null) return false;
-                  final dueDay = DateTime(due.year, due.month, due.day);
-                  return dueDay == today;
-                }).toList();
-              }
-            }
-          } else if (_viewType == TaskViewType.starred) {
-            displayedTasks = controller.tasks
-                .where((task) => task["priority"] == "high")
-                .toList();
-          } else if (_viewType == TaskViewType.archived) {
-            displayedTasks = controller.tasks
-                .where((task) => task["isArchived"] == true)
-                .toList();
-          }
-
-          final pending = displayedTasks
-              .where((t) => t["status"] == "pending")
+    if (_viewType == TaskViewType.normal) {
+      if (controller.taskLists.isNotEmpty) {
+        final currentList = controller.taskLists[controller.selectedListIndex];
+        currentListId = currentList['_id']?.toString();
+        if (currentList["isDefault"] != true) {
+          activeList = currentList;
+          displayedTasks = controller.tasks
+              .where((task) => task["taskListId"]?.toString() == currentListId)
               .toList();
+        } else {
+          // Default "My Tasks" list → show only tasks due today
+          isDefaultList = true;
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          displayedTasks = controller.tasks.where((task) {
+            final dueStr = task['dueDate'] as String?;
+            if (dueStr == null || dueStr.isEmpty) return false;
+            final due = DateTime.tryParse(dueStr)?.toLocal();
+            if (due == null) return false;
+            final dueDay = DateTime(due.year, due.month, due.day);
+            return dueDay == today;
+          }).toList();
+        }
+      }
+    } else if (_viewType == TaskViewType.starred) {
+      displayedTasks = controller.tasks
+          .where((task) => task["priority"] == "high")
+          .toList();
+    } else if (_viewType == TaskViewType.archived) {
+      displayedTasks = controller.tasks
+          .where((task) => task["isArchived"] == true)
+          .toList();
+    }
 
-          // Apply custom task order when in normal view with a known list
-          final orderedPending =
-              (_viewType == TaskViewType.normal && currentListId != null)
-              ? controller.getOrderedPendingTasks(currentListId, pending)
-              : pending;
+    final pending = displayedTasks
+        .where((t) => t["status"] == "pending")
+        .toList();
 
-          final completed = displayedTasks
-              .where((t) => t["status"] == "completed")
-              .toList();
+    // Apply custom task order when in normal view with a known list
+    final orderedPending =
+        (_viewType == TaskViewType.normal && currentListId != null)
+        ? controller.getOrderedPendingTasks(currentListId, pending)
+        : pending;
 
-          return Scaffold(
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            appBar: PreferredSize(
-              preferredSize: const Size.fromHeight(100),
-              child: AppBar(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                leading: _viewType == TaskViewType.normal
-                    ? IconButton(
-                        icon: const Icon(Icons.menu),
-                        onPressed: () => _openSidePanel(context, controller),
-                      )
-                    : IconButton(
-                        icon: const Icon(Icons.arrow_back),
-                        onPressed: () {
-                          setState(() {
-                            _viewType = TaskViewType.normal;
-                          });
-                        },
-                      ),
+    final completed = displayedTasks
+        .where((t) => t["status"] == "completed")
+        .toList();
 
-                // 🧠 CUSTOM TITLE ROW (Title + Time)
-                title: Row(
-                  mainAxisSize: MainAxisSize.min,
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(100),
+        child: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: _viewType == TaskViewType.normal
+              ? IconButton(
+                  icon: const Icon(Icons.menu),
+                  onPressed: () => _openSidePanel(context, controller),
+                )
+              : IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () {
+                    setState(() {
+                      _viewType = TaskViewType.normal;
+                    });
+                  },
+                ),
+
+          // 🧠 CUSTOM TITLE ROW (Title + Time)
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _viewType == TaskViewType.starred
+                    ? "Starred"
+                    : _viewType == TaskViewType.archived
+                    ? "Archived"
+                    : isDefaultList
+                    ? "Today"
+                    : "Tasks",
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _formattedTime,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.purple,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          centerTitle: true,
+
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 16.0),
+              child: GestureDetector(
+                onTap: () => _showProfileSheet(context),
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: Colors.grey[300],
+                  backgroundImage:
+                      controller.avatarUrl != null &&
+                          !controller.avatarUrl!.contains('placeholder')
+                      ? NetworkImage(controller.avatarUrl!)
+                      : null,
+                  child: controller.isLoadingAvatar
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : (controller.avatarUrl == null ||
+                            controller.avatarUrl!.contains('placeholder'))
+                      ? const Icon(Icons.person, color: Colors.grey)
+                      : null,
+                ),
+              ),
+            ),
+          ],
+
+          bottom: _viewType == TaskViewType.normal
+              ? PreferredSize(
+                  preferredSize: const Size.fromHeight(50),
+                  child: _buildTabBar(context, controller),
+                )
+              : null,
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: controller.refresh,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+          children: [
+            if (activeList != null)
+              _buildListHeader(
+                context,
+                activeList,
+                orderedPending.length,
+                completed.length,
+              ),
+            // "Today" empty state
+            if (isDefaultList && orderedPending.isEmpty && completed.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 60),
+                child: Column(
                   children: [
+                    Icon(
+                      Icons.wb_sunny_outlined,
+                      size: 64,
+                      color: Colors.grey[300],
+                    ),
+                    const SizedBox(height: 16),
                     Text(
-                      _viewType == TaskViewType.starred
-                          ? "Starred"
-                          : _viewType == TaskViewType.archived
-                          ? "Archived"
-                          : isDefaultList
-                          ? "Today"
-                          : "Tasks",
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
+                      'No tasks due today',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[500],
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.purple.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        _formattedTime,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.purple,
-                        ),
-                      ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Enjoy your day or add a task with a due date set to today.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: Colors.grey[400]),
                     ),
                   ],
                 ),
-                centerTitle: true,
-
-                actions: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: 16.0),
-                    child: GestureDetector(
-                      onTap: () => _showProfileSheet(context),
-                      child: CircleAvatar(
-                        radius: 18,
-                        backgroundColor: Colors.grey[300],
-                        backgroundImage:
-                            controller.avatarUrl != null &&
-                                !controller.avatarUrl!.contains('placeholder')
-                            ? NetworkImage(controller.avatarUrl!)
-                            : null,
-                        child: controller.isLoadingAvatar
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : (controller.avatarUrl == null ||
-                                  controller.avatarUrl!.contains('placeholder'))
-                            ? const Icon(Icons.person, color: Colors.grey)
-                            : null,
-                      ),
-                    ),
-                  ),
-                ],
-
-                bottom: _viewType == TaskViewType.normal
-                    ? PreferredSize(
-                        preferredSize: const Size.fromHeight(50),
-                        child: _buildTabBar(context, controller),
-                      )
-                    : null,
               ),
-            ),
-            body: RefreshIndicator(
-              onRefresh: controller.refresh,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-                children: [
-                  if (activeList != null)
-                    _buildListHeader(
-                      context,
-                      activeList,
-                      orderedPending.length,
-                      completed.length,
-                    ),
-                  // "Today" empty state
-                  if (isDefaultList &&
-                      orderedPending.isEmpty &&
-                      completed.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 60),
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.wb_sunny_outlined,
-                            size: 64,
-                            color: Colors.grey[300],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No tasks due today',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Enjoy your day or add a task with a due date set to today.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[400],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  // Reorderable pending tasks (long-press to drag)
-                  ReorderableListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    buildDefaultDragHandles: false,
-                    proxyDecorator: (child, index, animation) => Material(
-                      elevation: 6,
-                      borderRadius: BorderRadius.circular(16),
-                      shadowColor: Colors.purple.withOpacity(0.25),
-                      child: child,
-                    ),
-                    itemCount: orderedPending.length,
-                    itemBuilder: (_, i) {
-                      final task = orderedPending[i];
-                      return ReorderableDelayedDragStartListener(
-                        key: ValueKey(task['_id']),
-                        index: i,
-                        child: TaskItem(task: task, isCompleted: false),
-                      );
-                    },
-                    onReorder: (oldIdx, newIdx) {
-                      if (newIdx > oldIdx) newIdx--;
-                      if (currentListId != null) {
-                        controller.reorderTasks(
-                          currentListId,
-                          oldIdx,
-                          newIdx,
-                          orderedPending,
-                        );
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 32),
-                  CompletedSection(completedTasks: completed),
-                  const SizedBox(height: 40),
-                ],
+            // Reorderable pending tasks (long-press to drag)
+            ReorderableListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: false,
+              proxyDecorator: (child, index, animation) => Material(
+                elevation: 6,
+                borderRadius: BorderRadius.circular(16),
+                shadowColor: Colors.purple.withOpacity(0.25),
+                child: child,
               ),
+              itemCount: orderedPending.length,
+              itemBuilder: (_, i) {
+                final task = orderedPending[i];
+                return ReorderableDelayedDragStartListener(
+                  key: ValueKey(task['_id']),
+                  index: i,
+                  child: TaskItem(task: task, isCompleted: false),
+                );
+              },
+              onReorder: (oldIdx, newIdx) {
+                if (newIdx > oldIdx) newIdx--;
+                if (currentListId != null) {
+                  controller.reorderTasks(
+                    currentListId,
+                    oldIdx,
+                    newIdx,
+                    orderedPending,
+                  );
+                }
+              },
             ),
-            floatingActionButton: _viewType == TaskViewType.normal
-                ? FloatingActionButton(
-                    shape: const CircleBorder(),
-                    backgroundColor: Colors.purple,
-                    onPressed: () => showAddTaskSheet(context),
-                    child: const Icon(Icons.add, color: Colors.white, size: 32),
-                  )
-                : null,
-          );
+            const SizedBox(height: 32),
+            CompletedSection(completedTasks: completed),
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
+      floatingActionButton: _viewType == TaskViewType.normal
+          ? FloatingActionButton(
+              shape: const CircleBorder(),
+              backgroundColor: Colors.purple,
+              onPressed: () => showAddTaskSheet(context),
+              child: const Icon(Icons.add, color: Colors.white, size: 32),
+            )
+          : null,
+    );
   }
 
   // ─────────────────────────────────────────────────────────
