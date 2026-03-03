@@ -45,11 +45,15 @@ class AIController extends ChangeNotifier {
   Future<void> _saveMessages() async {
     final prefs = await SharedPreferences.getInstance();
     final encoded = jsonEncode(
-      messages.map((m) => {
-        'content': m.content,
-        'role': m.role.name,
-        'timestamp': m.timestamp.toIso8601String(),
-      }).toList(),
+      messages
+          .map(
+            (m) => {
+              'content': m.content,
+              'role': m.role.name,
+              'timestamp': m.timestamp.toIso8601String(),
+            },
+          )
+          .toList(),
     );
     await prefs.setString(_chatKey, encoded);
   }
@@ -365,24 +369,33 @@ class AIController extends ChangeNotifier {
       //    "Tap below to confirm" ones) because they confuse Gemini into
       //    mimicking that format instead of using ADD_TASK:.
       final history = messages.length > 1
-          ? messages.sublist(0, messages.length - 1) // exclude just-added user msg
+          ? messages.sublist(
+              0,
+              messages.length - 1,
+            ) // exclude just-added user msg
           : <ChatMessage>[];
       for (final msg in history) {
-        final isInternalConfirm = msg.role == MessageRole.assistant &&
+        final isInternalConfirm =
+            msg.role == MessageRole.assistant &&
             (msg.content.contains("Tap below to confirm") ||
-             msg.content.contains("I can add this task") ||
-             msg.content.contains("I understood this as a task"));
-        if (isInternalConfirm) continue; // don't send UI-only messages to Gemini
+                msg.content.contains("I can add this task") ||
+                msg.content.contains("I understood this as a task"));
+        if (isInternalConfirm)
+          continue; // don't send UI-only messages to Gemini
         contents.add({
           "role": msg.role == MessageRole.user ? "user" : "model",
-          "parts": [{"text": msg.content}],
+          "parts": [
+            {"text": msg.content},
+          ],
         });
       }
 
       // Finally, the current user message
       contents.add({
         "role": "user",
-        "parts": [{"text": userInput}],
+        "parts": [
+          {"text": userInput},
+        ],
       });
 
       final requestBody = {
@@ -436,7 +449,10 @@ class AIController extends ChangeNotifier {
         addMessage(aiReply.trim(), MessageRole.assistant);
       }
     } catch (e) {
-      addMessage("❌ Something went wrong. Please try again.", MessageRole.assistant);
+      addMessage(
+        "❌ Something went wrong. Please try again.",
+        MessageRole.assistant,
+      );
     } finally {
       isLoading = false;
       notifyListeners();
@@ -544,11 +560,12 @@ class AIController extends ChangeNotifier {
 
     final now = nowLocal();
 
-    return tasks.map((t) {
-      final title = t["title"] ?? "Untitled";
-      final status = t["status"] ?? "pending";
-      final priority = t["priority"] ?? "medium";
-      final notes = (t["notes"] ?? "").toString().trim();
+    return tasks
+        .map((t) {
+          final title = t["title"] ?? "Untitled";
+          final status = t["status"] ?? "pending";
+          final priority = t["priority"] ?? "medium";
+          final notes = (t["notes"] ?? "").toString().trim();
 
       // Convert UTC dueDate → local for display
       String dueDateStr = "No due date";
@@ -569,8 +586,9 @@ class AIController extends ChangeNotifier {
         }
       }
 
-      final notesPart = notes.isNotEmpty ? " | notes: $notes" : "";
-      return "- [$status] $title | due: $dueDateStr | priority: $priority$notesPart";
-    }).join("\n");
+          final notesPart = notes.isNotEmpty ? " | notes: $notes" : "";
+          return "- [$status] $title | due: $dueDateStr | priority: $priority$notesPart";
+        })
+        .join("\n");
   }
 }

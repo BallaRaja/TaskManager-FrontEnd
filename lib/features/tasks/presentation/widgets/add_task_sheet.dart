@@ -1,12 +1,18 @@
 // lib/features/tasks/presentation/widgets/add_task_sheet.dart
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:client/features/tasks/presentation/tasks_controller.dart';
 import 'package:client/features/calendar/presentation/calendar_controller.dart';
+import 'package:client/core/services/notification_service.dart';
 
 void showAddTaskSheet(BuildContext context) {
   final tasksController = Provider.of<TasksController>(context, listen: false);
-  final calendarController = Provider.of<CalendarController>(context, listen: false);
+  final calendarController = Provider.of<CalendarController>(
+    context,
+    listen: false,
+  );
 
   if (tasksController.taskLists.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -19,31 +25,34 @@ void showAddTaskSheet(BuildContext context) {
 
   // Use the currently selected task list
   final String currentTaskListId =
-      tasksController.taskLists[tasksController.selectedListIndex]["_id"] as String;
+      tasksController.taskLists[tasksController.selectedListIndex]["_id"]
+          as String;
 
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) =>
-        AddTaskSheet(
-          tasksController: tasksController,
-          calendarController: calendarController,
-          taskListId: currentTaskListId,
-        ),
+    builder: (_) => AddTaskSheet(
+      tasksController: tasksController,
+      calendarController: calendarController,
+      taskListId: currentTaskListId,
+      pageContext: context, // ← pass the page context for success dialog
+    ),
   );
 }
 
 class AddTaskSheet extends StatefulWidget {
   final TasksController tasksController;
   final CalendarController calendarController;
-  final String taskListId; // The ID of the list to add the task to
+  final String taskListId;
+  final BuildContext pageContext; // Parent page context for success dialog
 
   const AddTaskSheet({
     super.key,
     required this.tasksController,
     required this.calendarController,
     required this.taskListId,
+    required this.pageContext,
   });
 
   @override
@@ -518,24 +527,210 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
 
     try {
       final createdTask = await widget.tasksController.createTask(body);
-      if (mounted) {
-        if (createdTask != null) {
-          widget.calendarController.upsertTaskLocal(createdTask);
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text("Task created!")));
-          Navigator.pop(context);
-        } else {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text("Failed to create task")));
+      if (!mounted) return;
+
+      if (createdTask != null) {
+        widget.calendarController.upsertTaskLocal(createdTask);
+
+        // Schedule 2-min reminder if task has a due date/time
+        if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+          await NotificationService().scheduleTaskReminder(createdTask);
         }
+
+        // Close sheet first, then show success popup using the page context
+        if (mounted) Navigator.pop(context);
+        _showTaskCreatedDialog(widget.pageContext, createdTask);
+      } else {
+        // ❌ FAILURE — keep sheet open, show error dialog
+        _showErrorDialog(context, "Failed to create task. Please try again.");
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (mounted) {
+        _showErrorDialog(context, "Something went wrong: $e");
+      }
     }
+  }
+
+  void _showTaskCreatedDialog(
+    BuildContext ctx,
+    Map<String, dynamic> createdTask,
+  ) {
+    final String title = createdTask['title'] ?? 'Task';
+    final String? dueIso = createdTask['dueDate'];
+    String dueLabel = 'No due date';
+    if (dueIso != null) {
+      final dt = DateTime.parse(dueIso).toLocal();
+      final h = dt.hour == 0
+          ? 12
+          : dt.hour > 12
+          ? dt.hour - 12
+          : dt.hour;
+      final m = dt.minute.toString().padLeft(2, '0');
+      final s = dt.second.toString().padLeft(2, '0');
+      final p = dt.hour < 12 ? 'AM' : 'PM';
+      const months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+      dueLabel = '${dt.day} ${months[dt.month - 1]} ${dt.year}  •  $h:$m:$s $p';
+    }
+
+    showDialog(
+      context: ctx,
+      barrierDismissible: true,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.all(24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.purple.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_circle_rounded,
+                color: Colors.purple,
+                size: 40,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Task Created!',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.task_alt,
+                        size: 16,
+                        color: Colors.purple,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.access_time,
+                        size: 14,
+                        color: Colors.grey[600],
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          dueLabel,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            if (dueIso != null) ...[
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.notifications_active,
+                    size: 14,
+                    color: Colors.purple[300],
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Reminder set for 2 min before',
+                    style: TextStyle(fontSize: 12, color: Colors.purple[400]),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.purple,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text(
+                'Great!',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showErrorDialog(BuildContext ctx, String message) {
+    showDialog(
+      context: ctx,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Error'),
+          ],
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('OK', style: TextStyle(color: Colors.purple)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

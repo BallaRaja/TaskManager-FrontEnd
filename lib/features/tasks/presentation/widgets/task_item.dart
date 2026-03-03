@@ -1,10 +1,13 @@
 // lib/features/tasks/presentation/widgets/task_item.dart
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:client/core/constants/api_constants.dart';
 import 'package:client/core/utils/session_manager.dart';
+import 'package:client/core/services/notification_service.dart';
 import 'package:client/features/tasks/presentation/tasks_controller.dart';
 import 'package:client/features/tasks/presentation/widgets/edit_task_sheet.dart';
 
@@ -23,14 +26,41 @@ class TaskItem extends StatelessWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final taskDay = DateTime(date.year, date.month, date.day);
+
+    // Format time as 12-hour HH:MM AM/PM (matches device local time)
+    final hour = date.hour == 0
+        ? 12
+        : date.hour > 12
+        ? date.hour - 12
+        : date.hour;
+    final minute = date.minute.toString().padLeft(2, '0');
+    final period = date.hour < 12 ? 'AM' : 'PM';
+    final timeStr = '$hour:$minute $period';
+
     if (taskDay == today) {
-      final hour = date.hour.toString().padLeft(2, '0');
-      final minute = date.minute.toString().padLeft(2, '0');
-      return "Today, $hour:$minute";
+      return "Today, $timeStr";
     } else if (taskDay.difference(today).inDays == 1) {
-      return "Tomorrow";
+      return "Tomorrow, $timeStr";
+    } else if (taskDay.isBefore(today)) {
+      final diff = today.difference(taskDay).inDays;
+      return "${diff}d overdue • $timeStr";
+    } else {
+      const months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+      return "${date.day} ${months[date.month - 1]}, $timeStr";
     }
-    return "Later";
   }
 
   void _updateLocalTask(
@@ -38,14 +68,20 @@ class TaskItem extends StatelessWidget {
     Map<String, dynamic> updatedTask,
   ) {
     final tasksCtrl = Provider.of<TasksController>(context, listen: false);
-    final calendarCtrl = Provider.of<CalendarController>(context, listen: false);
+    final calendarCtrl = Provider.of<CalendarController>(
+      context,
+      listen: false,
+    );
     tasksCtrl.upsertTaskLocal(updatedTask);
     calendarCtrl.upsertTaskLocal(updatedTask);
   }
 
   void _removeLocalTask(BuildContext context) {
     final tasksCtrl = Provider.of<TasksController>(context, listen: false);
-    final calendarCtrl = Provider.of<CalendarController>(context, listen: false);
+    final calendarCtrl = Provider.of<CalendarController>(
+      context,
+      listen: false,
+    );
     final taskId = task["_id"].toString();
     tasksCtrl.removeTaskLocal(taskId);
     calendarCtrl.removeTaskLocal(taskId);
@@ -59,9 +95,10 @@ class TaskItem extends StatelessWidget {
     // Optimistic update
     final optimisticTask = Map<String, dynamic>.from(task);
     optimisticTask["status"] = newStatus;
-    optimisticTask["completedAt"] =
-        newStatus == "completed" ? DateTime.now().toIso8601String() : null;
-    
+    optimisticTask["completedAt"] = newStatus == "completed"
+        ? DateTime.now().toIso8601String()
+        : null;
+
     _updateLocalTask(context, optimisticTask);
 
     try {
@@ -72,16 +109,25 @@ class TaskItem extends StatelessWidget {
       if (success == null && context.mounted) {
         // Revert on failure
         _updateLocalTask(context, task);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to update task")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Failed to update task")));
+      } else if (success != null) {
+        // Cancel reminder if task is completed; reschedule if uncompleted
+        if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+          if (newStatus == "completed") {
+            await NotificationService().cancelTaskReminder(taskId);
+          } else {
+            await NotificationService().scheduleTaskReminder(success);
+          }
+        }
       }
     } catch (e) {
       if (context.mounted) {
         _updateLocalTask(context, task);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Network error")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Network error")));
       }
     }
   }
@@ -144,11 +190,18 @@ class TaskItem extends StatelessWidget {
 
   Future<void> _deleteTask(BuildContext context) async {
     final tasksCtrl = Provider.of<TasksController>(context, listen: false);
-    final calendarCtrl = Provider.of<CalendarController>(context, listen: false);
+    final calendarCtrl = Provider.of<CalendarController>(
+      context,
+      listen: false,
+    );
     final taskId = task["_id"].toString();
     try {
       await tasksCtrl.deleteTask(taskId);
       calendarCtrl.removeTaskLocal(taskId);
+      // Cancel any scheduled reminder for this task
+      if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+        await NotificationService().cancelTaskReminder(taskId);
+      }
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -160,9 +213,9 @@ class TaskItem extends StatelessWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to delete")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Failed to delete")));
       }
     }
   }
@@ -181,7 +234,17 @@ class TaskItem extends StatelessWidget {
         body: jsonEncode({"isArchived": true}),
       );
       if (response.statusCode == 200) {
-        _removeLocalTask(context);
+        // Update the local task's isArchived flag so it moves to Archived view
+        // immediately without needing a full refresh.
+        final updatedTask = Map<String, dynamic>.from(task);
+        updatedTask["isArchived"] = true;
+        final tasksCtrl = Provider.of<TasksController>(context, listen: false);
+        final calendarCtrl = Provider.of<CalendarController>(
+          context,
+          listen: false,
+        );
+        tasksCtrl.upsertTaskLocal(updatedTask);
+        calendarCtrl.upsertTaskLocal(updatedTask);
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -214,7 +277,17 @@ class TaskItem extends StatelessWidget {
         body: jsonEncode({"isArchived": false}),
       );
       if (response.statusCode == 200) {
-        _removeLocalTask(context);
+        // Update the local task's isArchived flag so it moves back to its list view
+        // immediately without needing a full refresh.
+        final updatedTask = Map<String, dynamic>.from(task);
+        updatedTask["isArchived"] = false;
+        final tasksCtrl = Provider.of<TasksController>(context, listen: false);
+        final calendarCtrl = Provider.of<CalendarController>(
+          context,
+          listen: false,
+        );
+        tasksCtrl.upsertTaskLocal(updatedTask);
+        calendarCtrl.upsertTaskLocal(updatedTask);
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -236,7 +309,9 @@ class TaskItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dueText = _formatDueDate(task["dueDate"]);
-    final isToday = dueText?.startsWith("Today") == true;
+    final bool isUrgent =
+        dueText?.startsWith("Today") == true ||
+        (dueText?.contains("overdue") == true);
     final bool isArchived = task["isArchived"] == true;
     final bool isImportant = task["priority"] == "high";
     return Dismissible(
@@ -429,12 +504,45 @@ class TaskItem extends StatelessWidget {
                     if (dueText != null || task["notes"] != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          dueText ?? task["notes"] ?? "",
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isToday ? Colors.red : Colors.grey[600],
-                          ),
+                        child: Row(
+                          children: [
+                            if (dueText != null) ...[
+                              Icon(
+                                Icons.access_time_rounded,
+                                size: 12,
+                                color: isUrgent ? Colors.red : Colors.grey[500],
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  dueText,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isUrgent
+                                        ? Colors.red
+                                        : Colors.grey[600],
+                                    fontWeight: isUrgent
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                            ],
+                            if (task["notes"] != null && dueText == null)
+                              Expanded(
+                                child: Text(
+                                  task["notes"] ?? "",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                   ],
