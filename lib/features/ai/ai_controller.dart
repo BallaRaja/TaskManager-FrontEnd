@@ -22,8 +22,8 @@ class AIController extends ChangeNotifier {
   /// Task waiting for user confirmation
   Map<String, dynamic>? pendingTaskToCreate;
 
-  /// IST offset (fixed for India)
-  static const Duration istOffset = Duration(hours: 5, minutes: 30);
+  /// System timezone name for prompt context
+  static final String _tzLabel = DateTime.now().timeZoneName;
 
   static const String _chatKey = 'ai_chat_messages';
   static const String _suggestionsKey = 'ai_suggestions';
@@ -99,7 +99,7 @@ class AIController extends ChangeNotifier {
 
     try {
       final taskContext = await _fetchTaskContext();
-      final istNow = nowIST();
+      final now = nowLocal();
 
       final uri = Uri.parse(
         "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=$apiKey",
@@ -116,7 +116,7 @@ class AIController extends ChangeNotifier {
                     "Based on the user's current tasks and the time, generate exactly 4 short, "
                     "helpful suggestion chip labels (max 6 words each) that the user might want to ask. "
                     "Return ONLY a JSON array of 4 strings, no explanation, no markdown.\n\n"
-                    "Current IST time: ${DateFormat('EEE d MMM, h:mm a').format(istNow)}\n"
+                    "Current time ($_tzLabel): ${DateFormat('EEE d MMM, h:mm a').format(now)}\n"
                     "Current tasks:\n$taskContext",
               },
             ],
@@ -184,19 +184,22 @@ class AIController extends ChangeNotifier {
 
   /* ───────────────────────── TIME HELPERS ───────────────────────── */
 
-  /// Current IST time (authoritative)
-  DateTime nowIST() {
-    return DateTime.now().toUtc().add(istOffset);
+  /// Current local time (uses system timezone)
+  DateTime nowLocal() {
+    return DateTime.now();
   }
 
-  /// Convert IST → UTC ISO for backend
-  String toUtcIso(DateTime istTime) {
-    return istTime.subtract(istOffset).toIso8601String();
+  // Keep old name as alias so callers still work
+  DateTime nowIST() => nowLocal();
+
+  /// Convert local time → UTC ISO for backend
+  String toUtcIso(DateTime localTime) {
+    return localTime.toUtc().toIso8601String();
   }
 
-  /// Pretty display for confirmation (IST)
-  String formatForDisplay(DateTime istTime) {
-    return DateFormat("EEE, d MMM yyyy 'at' h:mm a").format(istTime);
+  /// Pretty display for confirmation (local time)
+  String formatForDisplay(DateTime localTime) {
+    return DateFormat("EEE, d MMM yyyy 'at' h:mm a").format(localTime);
   }
 
   bool looksLikeTask(String input) {
@@ -302,10 +305,10 @@ class AIController extends ChangeNotifier {
     try {
       final taskContext = await _fetchTaskContext();
 
-      final istNow = nowIST();
-      final istNowStr = DateFormat("EEE, d MMM yyyy 'at' h:mm a").format(istNow);
+      final now = nowLocal();
+      final nowStr = DateFormat("EEE, d MMM yyyy 'at' h:mm a").format(now);
       final tomorrowStr = DateFormat("EEE, d MMM yyyy").format(
-        istNow.add(const Duration(days: 1)),
+        now.add(const Duration(days: 1)),
       );
 
       final uri = Uri.parse(
@@ -321,8 +324,8 @@ class AIController extends ChangeNotifier {
           "parts": [
             {
               "text":
-                  "You are a helpful task management AI assistant for Indian users.\n\n"
-                  "CURRENT IST DATE & TIME: $istNowStr (UTC+05:30)\n"
+                  "You are a helpful task management AI assistant.\n\n"
+                  "CURRENT DATE & TIME ($_tzLabel): $nowStr\n"
                   "TOMORROW IS: $tomorrowStr\n\n"
                   "TIME RULES:\n"
                   "- morning = 5:00 AM – 11:59 AM\n"
@@ -339,7 +342,7 @@ class AIController extends ChangeNotifier {
                   "format and NOTHING else — no explanation, no extra text:\n"
                   "   ADD_TASK:{title}|{dueDateISO}|{priority}|{notes}|{repeat}\n\n"
                   "   Priority must be: low, medium, or high.\n"
-                  "   dueDateISO must be in IST (UTC+05:30) in ISO 8601 format.\n"
+                  "   dueDateISO must be in the user's local time in ISO 8601 format.\n"
                   "   Leave notes/repeat empty if not mentioned.\n"
                   "4. For all other queries (listing, counting, advice), reply in plain friendly text.",
             },
@@ -537,7 +540,7 @@ class AIController extends ChangeNotifier {
     final List tasks = jsonDecode(res.body)["data"] ?? [];
     if (tasks.isEmpty) return "No tasks.";
 
-    final istNow = nowIST();
+    final now = nowLocal();
 
     return tasks.map((t) {
       final title = t["title"] ?? "Untitled";
@@ -545,18 +548,18 @@ class AIController extends ChangeNotifier {
       final priority = t["priority"] ?? "medium";
       final notes = (t["notes"] ?? "").toString().trim();
 
-      // Convert UTC dueDate → IST for display
+      // Convert UTC dueDate → local for display
       String dueDateStr = "No due date";
       if (t["dueDate"] != null && t["dueDate"].toString().isNotEmpty) {
         final utcDate = DateTime.tryParse(t["dueDate"].toString());
         if (utcDate != null) {
-          final istDate = utcDate.toUtc().add(istOffset);
-          dueDateStr = DateFormat("EEE, d MMM yyyy 'at' h:mm a").format(istDate);
+          final localDate = utcDate.toLocal();
+          dueDateStr = DateFormat("EEE, d MMM yyyy 'at' h:mm a").format(localDate);
 
           // Label relative days for clarity
-          final todayIST = DateTime(istNow.year, istNow.month, istNow.day);
-          final taskDay = DateTime(istDate.year, istDate.month, istDate.day);
-          final diff = taskDay.difference(todayIST).inDays;
+          final todayLocal = DateTime(now.year, now.month, now.day);
+          final taskDay = DateTime(localDate.year, localDate.month, localDate.day);
+          final diff = taskDay.difference(todayLocal).inDays;
           if (diff == 0) dueDateStr += " (TODAY)";
           else if (diff == 1) dueDateStr += " (TOMORROW)";
           else if (diff == -1) dueDateStr += " (YESTERDAY)";
