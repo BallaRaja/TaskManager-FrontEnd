@@ -214,13 +214,18 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                       context: context,
                       initialTime:
                           _selectedTime ?? const TimeOfDay(hour: 9, minute: 0),
-                      builder: (context, child) => Theme(
-                        data: Theme.of(context).copyWith(
-                          colorScheme: Theme.of(
-                            context,
-                          ).colorScheme.copyWith(primary: Colors.purple),
+                      builder: (context, child) => MediaQuery(
+                        data: MediaQuery.of(
+                          context,
+                        ).copyWith(alwaysUse24HourFormat: false),
+                        child: Theme(
+                          data: Theme.of(context).copyWith(
+                            colorScheme: Theme.of(
+                              context,
+                            ).colorScheme.copyWith(primary: Colors.purple),
+                          ),
+                          child: child!,
                         ),
-                        child: child!,
                       ),
                     );
                     if (time != null) {
@@ -672,24 +677,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                 ],
               ),
             ),
-            if (dueIso != null) ...[
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.notifications_active,
-                    size: 14,
-                    color: Colors.purple[300],
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Reminder set for 2 min before',
-                    style: TextStyle(fontSize: 12, color: Colors.purple[400]),
-                  ),
-                ],
-              ),
-            ],
           ],
         ),
         actions: [
@@ -698,7 +685,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
             child: ElevatedButton(
               onPressed: () => Navigator.pop(dialogCtx),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
+                backgroundColor: Colors.purple,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -718,10 +705,7 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
     );
   }
 
-  void _showOfflineQueuedDialog(
-    BuildContext ctx,
-    Map<String, dynamic> task,
-  ) {
+  void _showOfflineQueuedDialog(BuildContext ctx, Map<String, dynamic> task) {
     final String title = task['title'] ?? 'Task';
 
     showDialog(
@@ -766,14 +750,16 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.sync_rounded,
-                      size: 16, color: Colors.orange),
+                  const Icon(
+                    Icons.sync_rounded,
+                    size: 16,
+                    color: Colors.orange,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Will sync when connected',
-                      style:
-                          TextStyle(fontSize: 12, color: Colors.orange[700]),
+                      style: TextStyle(fontSize: 12, color: Colors.orange[700]),
                     ),
                   ),
                 ],

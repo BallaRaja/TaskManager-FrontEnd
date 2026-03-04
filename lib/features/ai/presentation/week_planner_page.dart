@@ -46,7 +46,9 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
   }
 
   void _onPlannerUpdate() {
-    debugPrint('📍 [WeekPlannerPage] _onPlannerUpdate: isGenerating=${_planner.isGenerating}, tasks=${_planner.generatedTasks.length}, error=${_planner.errorMessage}');
+    debugPrint(
+      '📍 [WeekPlannerPage] _onPlannerUpdate: isGenerating=${_planner.isGenerating}, tasks=${_planner.generatedTasks.length}, error=${_planner.errorMessage}',
+    );
     if (mounted) setState(() {});
     if (_planner.generatedTasks.isNotEmpty) _fadeCtrl.forward(from: 0);
   }
@@ -64,10 +66,16 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
 
   Future<void> _pickWeekStart() async {
     final now = DateTime.now();
-    final firstDate = DateTime(now.year, now.month, now.day)
-        .subtract(const Duration(days: 60));
-    final lastDate = DateTime(now.year, now.month, now.day)
-        .add(const Duration(days: 365));
+    final firstDate = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(const Duration(days: 60));
+    final lastDate = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).add(const Duration(days: 365));
 
     // Ensure initialDate is clamped within range
     DateTime initial = _weekStart;
@@ -83,9 +91,9 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
       builder: (ctx, child) {
         return Theme(
           data: Theme.of(ctx).copyWith(
-            colorScheme: Theme.of(ctx).colorScheme.copyWith(
-                  primary: Colors.deepPurple,
-                ),
+            colorScheme: Theme.of(
+              ctx,
+            ).colorScheme.copyWith(primary: Colors.deepPurple),
           ),
           child: child!,
         );
@@ -104,11 +112,14 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
 
   void _generate() {
     final prompt = _promptCtrl.text.trim();
-    debugPrint('📍 [WeekPlannerPage] _generate() prompt="$prompt", weekStart=$_weekStart');
+    debugPrint(
+      '📍 [WeekPlannerPage] _generate() prompt="$prompt", weekStart=$_weekStart',
+    );
     if (prompt.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Tell the AI what to plan for your week!')),
+          content: Text('Tell the AI what to plan for your week!'),
+        ),
       );
       return;
     }
@@ -131,8 +142,9 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
           ),
           backgroundColor: Colors.green[700],
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
       Navigator.pop(context, true);
@@ -183,7 +195,12 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
                 const SizedBox(height: 20),
 
                 // ── Day-by-day existing tasks ──
-                _buildExistingWeekView(existingTasks, isDark, startLabel, endLabel),
+                _buildExistingWeekView(
+                  existingTasks,
+                  isDark,
+                  startLabel,
+                  endLabel,
+                ),
                 const SizedBox(height: 24),
 
                 // ── Prompt ──
@@ -233,13 +250,16 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
                           ? 'Generating…'
                           : 'Generate Week Plan',
                       style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w600),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.deepPurple,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                       elevation: 0,
                     ),
                   ),
@@ -274,7 +294,9 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
                             Text(
                               '${_planner.generatedTasks.length} tasks',
                               style: TextStyle(
-                                  color: Colors.grey[500], fontSize: 12),
+                                color: Colors.grey[500],
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         ),
@@ -287,8 +309,9 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
                           width: double.infinity,
                           height: 52,
                           child: ElevatedButton.icon(
-                            onPressed:
-                                _planner.isUploading ? null : _confirmUpload,
+                            onPressed: _planner.isUploading
+                                ? null
+                                : _confirmUpload,
                             icon: _planner.isUploading
                                 ? const SizedBox(
                                     width: 20,
@@ -304,13 +327,16 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
                                   ? 'Uploading…'
                                   : 'Confirm & Add All Tasks',
                               style: const TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.w600),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green[700],
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14)),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
                               elevation: 0,
                             ),
                           ),
@@ -330,7 +356,11 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
      ════════════════════════════════════════════════════════════════ */
 
   Widget _buildExistingWeekView(
-      List<Map<String, dynamic>> tasks, bool isDark, String start, String end) {
+    List<Map<String, dynamic>> tasks,
+    bool isDark,
+    String start,
+    String end,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -402,8 +432,10 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
             children: [
               // Day header
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.deepPurple.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -443,10 +475,15 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
     final titleCtrl = TextEditingController(text: task.title);
     final notesCtrl = TextEditingController(text: task.notes);
     String selectedPriority = task.priority;
-    TimeOfDay selectedTime =
-        TimeOfDay(hour: task.dueDate.hour, minute: task.dueDate.minute);
+    TimeOfDay selectedTime = TimeOfDay(
+      hour: task.dueDate.hour,
+      minute: task.dueDate.minute,
+    );
     DateTime selectedDate = DateTime(
-        task.dueDate.year, task.dueDate.month, task.dueDate.day);
+      task.dueDate.year,
+      task.dueDate.month,
+      task.dueDate.day,
+    );
 
     showModalBottomSheet(
       context: context,
@@ -471,12 +508,19 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
                   // Header
                   Row(
                     children: [
-                      const Icon(Icons.edit_rounded,
-                          color: Colors.deepPurple, size: 22),
+                      const Icon(
+                        Icons.edit_rounded,
+                        color: Colors.deepPurple,
+                        size: 22,
+                      ),
                       const SizedBox(width: 8),
-                      const Text('Edit Task',
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.bold)),
+                      const Text(
+                        'Edit Task',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       const Spacer(),
                       IconButton(
                         icon: const Icon(Icons.close_rounded),
@@ -492,7 +536,8 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
                     decoration: InputDecoration(
                       labelText: 'Title',
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -504,12 +549,13 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
                     decoration: InputDecoration(
                       labelText: 'Notes',
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
 
-                  // Date + Priority + Time
+                  // Date + Priority
                   Row(
                     children: [
                       // Date chip
@@ -531,33 +577,44 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
                             decoration: InputDecoration(
                               labelText: 'Date',
                               border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12)),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                               contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 14),
+                                horizontal: 12,
+                                vertical: 14,
+                              ),
                             ),
                             child: Text(
-                                DateFormat('EEE, d').format(selectedDate)),
+                              DateFormat('EEE, d').format(selectedDate),
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 10),
                       // Priority
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           value: selectedPriority,
+                          isExpanded: true,
                           decoration: InputDecoration(
                             labelText: 'Priority',
                             border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12)),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 14),
+                              horizontal: 12,
+                              vertical: 14,
+                            ),
                           ),
                           items: ['low', 'medium', 'high']
-                              .map((p) => DropdownMenuItem(
-                                    value: p,
-                                    child: Text(
-                                        p[0].toUpperCase() + p.substring(1)),
-                                  ))
+                              .map(
+                                (p) => DropdownMenuItem(
+                                  value: p,
+                                  child: Text(
+                                    p[0].toUpperCase() + p.substring(1),
+                                  ),
+                                ),
+                              )
                               .toList(),
                           onChanged: (v) {
                             if (v != null) {
@@ -566,35 +623,47 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
                           },
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      // Time
-                      SizedBox(
-                        width: 90,
-                        child: InkWell(
-                          onTap: () async {
-                            final picked = await showTimePicker(
-                              context: ctx,
-                              initialTime: selectedTime,
-                            );
-                            if (picked != null) {
-                              setSheetState(() => selectedTime = picked);
-                            }
-                          },
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Time
+                  InkWell(
+                    onTap: () async {
+                      final picked = await showTimePicker(
+                        context: ctx,
+                        initialTime: selectedTime,
+                      );
+                      if (picked != null) {
+                        setSheetState(() => selectedTime = picked);
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: 'Time',
+                        border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          child: InputDecorator(
-                            decoration: InputDecoration(
-                              labelText: 'Time',
-                              border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 14),
-                            ),
-                            child: Text(selectedTime.format(ctx),
-                                style: const TextStyle(fontSize: 13)),
-                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 14,
                         ),
                       ),
-                    ],
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.access_time_rounded,
+                            color: Colors.deepPurple[300],
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            selectedTime.format(ctx),
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 20),
 
@@ -625,10 +694,13 @@ class _WeekPlannerPageState extends State<WeekPlannerPage>
                         backgroundColor: Colors.deepPurple,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                      child: const Text('Save Changes',
-                          style: TextStyle(fontWeight: FontWeight.w600)),
+                      child: const Text(
+                        'Save Changes',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
                 ],
@@ -675,9 +747,11 @@ class _WeekCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(Icons.date_range_rounded,
-                color: isDark ? Colors.deepPurple[200] : Colors.deepPurple,
-                size: 24),
+            Icon(
+              Icons.date_range_rounded,
+              color: isDark ? Colors.deepPurple[200] : Colors.deepPurple,
+              size: 24,
+            ),
             const SizedBox(width: 14),
             Expanded(
               child: Text(
@@ -689,9 +763,11 @@ class _WeekCard extends StatelessWidget {
                 ),
               ),
             ),
-            Icon(Icons.edit_calendar_rounded,
-                color: isDark ? Colors.white60 : Colors.deepPurple[300],
-                size: 20),
+            Icon(
+              Icons.edit_calendar_rounded,
+              color: isDark ? Colors.white60 : Colors.deepPurple[300],
+              size: 20,
+            ),
           ],
         ),
       ),
@@ -741,17 +817,13 @@ class _EmptyHint extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? Colors.white.withOpacity(0.04) : Colors.grey[50],
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? Colors.white10 : Colors.grey[200]!,
-        ),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.grey[200]!),
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline_rounded,
-              size: 18, color: Colors.grey[500]),
+          Icon(Icons.info_outline_rounded, size: 18, color: Colors.grey[500]),
           const SizedBox(width: 10),
-          Text(text,
-              style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+          Text(text, style: TextStyle(color: Colors.grey[500], fontSize: 13)),
         ],
       ),
     );
@@ -788,9 +860,7 @@ class _MiniTaskTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isDark ? Colors.white10 : Colors.grey[200]!,
-        ),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.grey[200]!),
       ),
       child: Row(
         children: [
@@ -861,9 +931,7 @@ class _PlannedWeekTaskCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: isDark ? Colors.white.withOpacity(0.06) : Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? Colors.white12 : Colors.grey[200]!,
-        ),
+        border: Border.all(color: isDark ? Colors.white12 : Colors.grey[200]!),
       ),
       child: Material(
         color: Colors.transparent,
@@ -877,8 +945,10 @@ class _PlannedWeekTaskCard extends StatelessWidget {
               children: [
                 // Time
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.deepPurple.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(6),
@@ -901,7 +971,9 @@ class _PlannedWeekTaskCard extends StatelessWidget {
                       Text(
                         task.title,
                         style: const TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w600),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       if (task.notes.isNotEmpty) ...[
                         const SizedBox(height: 1),
@@ -910,7 +982,9 @@ class _PlannedWeekTaskCard extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                              fontSize: 11, color: Colors.grey[500]),
+                            fontSize: 11,
+                            color: Colors.grey[500],
+                          ),
                         ),
                       ],
                     ],
@@ -923,8 +997,11 @@ class _PlannedWeekTaskCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                   child: Padding(
                     padding: const EdgeInsets.all(4),
-                    child: Icon(Icons.close_rounded,
-                        size: 16, color: Colors.grey[400]),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 16,
+                      color: Colors.grey[400],
+                    ),
                   ),
                 ),
               ],

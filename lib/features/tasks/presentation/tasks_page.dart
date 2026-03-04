@@ -15,6 +15,7 @@ import 'package:client/features/tasks/presentation/widgets/task_list_tab.dart';
 import 'package:client/features/tasks/presentation/widgets/task_item.dart';
 import 'package:client/features/ai/presentation/day_planner_page.dart';
 import 'package:client/features/ai/presentation/week_planner_page.dart';
+import 'package:client/features/pomodoro/presentation/pomodoro_page.dart';
 import 'widgets/completed_section.dart';
 
 class TasksPage extends StatefulWidget {
@@ -387,15 +388,19 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
                     child: Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(10),
+                          padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
                             color: Colors.purple.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(
-                            Icons.check_circle_outline_rounded,
-                            color: Colors.purple,
-                            size: 26,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.asset(
+                              'assets/logo.png',
+                              width: 34,
+                              height: 34,
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -455,6 +460,13 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
                       MaterialPageRoute(builder: (_) => const SummaryPage()),
                     );
                   }, false),
+                  _panelTile(ctx, Icons.timer_rounded, 'Pomodoro', () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const PomodoroPage()),
+                    );
+                  }, false),
 
                   // ── AI PLANNER section ──
                   const SizedBox(height: 16),
@@ -472,46 +484,30 @@ class _TasksPageState extends State<TasksPage> with WidgetsBindingObserver {
                       ),
                     ),
                   ),
-                  _panelTile(
-                    ctx,
-                    Icons.today_rounded,
-                    'Day Planner',
-                    () {
-                      Navigator.pop(ctx);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const DayPlannerPage()),
-                      ).then((refreshed) {
-                        if (refreshed == true) {
-                          context
-                              .read<TasksController>()
-                              .refresh();
-                        }
-                      });
-                    },
-                    false,
-                  ),
-                  _panelTile(
-                    ctx,
-                    Icons.date_range_rounded,
-                    'Week Planner',
-                    () {
-                      Navigator.pop(ctx);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const WeekPlannerPage()),
-                      ).then((refreshed) {
-                        if (refreshed == true) {
-                          context
-                              .read<TasksController>()
-                              .refresh();
-                        }
-                      });
-                    },
-                    false,
-                  ),
+                  _panelTile(ctx, Icons.today_rounded, 'Day Planner', () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const DayPlannerPage()),
+                    ).then((refreshed) {
+                      if (refreshed == true) {
+                        context.read<TasksController>().refresh();
+                      }
+                    });
+                  }, false),
+                  _panelTile(ctx, Icons.date_range_rounded, 'Week Planner', () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const WeekPlannerPage(),
+                      ),
+                    ).then((refreshed) {
+                      if (refreshed == true) {
+                        context.read<TasksController>().refresh();
+                      }
+                    });
+                  }, false),
 
                   // ── MY LISTS + Logout section ──
                   ..._buildSidePanelLists(ctx, controller),

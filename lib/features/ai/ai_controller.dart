@@ -311,9 +311,9 @@ class AIController extends ChangeNotifier {
 
       final now = nowLocal();
       final nowStr = DateFormat("EEE, d MMM yyyy 'at' h:mm a").format(now);
-      final tomorrowStr = DateFormat("EEE, d MMM yyyy").format(
-        now.add(const Duration(days: 1)),
-      );
+      final tomorrowStr = DateFormat(
+        "EEE, d MMM yyyy",
+      ).format(now.add(const Duration(days: 1)));
 
       final uri = Uri.parse(
         "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=$apiKey",
@@ -348,7 +348,19 @@ class AIController extends ChangeNotifier {
                   "   Priority must be: low, medium, or high.\n"
                   "   dueDateISO must be in the user's local time in ISO 8601 format.\n"
                   "   Leave notes/repeat empty if not mentioned.\n"
-                  "4. For all other queries (listing, counting, advice), reply in plain friendly text.",
+                  "4. RESPONSE FORMATTING for listing/querying tasks:\n"
+                  "   - Use bullet points starting with '- ' for each task.\n"
+                  "   - Use **bold** for task titles (double asterisks only, never single).\n"
+                  "   - NEVER use single asterisks (*) around text. Always use ** for bold or nothing.\n"
+                  "   - Show each task on its own line with clear details like due date, priority, status.\n"
+                  "   - Example format for listing tasks:\n"
+                  "     Here are your overdue tasks:\n\n"
+                  "     - **Buy groceries** — Due: Mon, 3 Mar at 5:00 PM — Priority: high\n"
+                  "     - **Submit report** — Due: Sun, 2 Mar at 9:00 AM — Priority: medium\n\n"
+                  "     You have 2 overdue tasks. Would you like to reschedule any?\n"
+                  "   - Always include a brief summary count and optionally a helpful suggestion at the end.\n"
+                  "   - For empty results, say so clearly (e.g., 'You have no overdue tasks. Great job! 🎉').\n"
+                  "5. NEVER output raw data fields like status codes, IDs, or pipe-separated values to the user.",
             },
           ],
         },
@@ -421,7 +433,7 @@ class AIController extends ChangeNotifier {
             "priority": "medium",
             "notes": "",
             "repeat": null,
-          };    
+          };
 
           addMessage(
             "I understood this as a task:\n\n"
@@ -475,7 +487,9 @@ class AIController extends ChangeNotifier {
     pendingTaskToCreate = {
       "title": parts[0].trim(),
       "dueDateLocal": localDue,
-      "dueDateUTC": localDue != null ? localDue.toUtc().toIso8601String() : null,
+      "dueDateUTC": localDue != null
+          ? localDue.toUtc().toIso8601String()
+          : null,
       "priority": parts[2].trim().isEmpty ? "medium" : parts[2].trim(),
       "notes": parts[3].trim(),
       "repeat": parts[4].trim().isEmpty ? null : parts[4].trim(),
@@ -566,28 +580,42 @@ class AIController extends ChangeNotifier {
           final status = t["status"] ?? "pending";
           final priority = t["priority"] ?? "medium";
           final notes = (t["notes"] ?? "").toString().trim();
+          final isImportant = t["isImportant"] == true;
 
-      // Convert UTC dueDate → local for display
-      String dueDateStr = "No due date";
-      if (t["dueDate"] != null && t["dueDate"].toString().isNotEmpty) {
-        final utcDate = DateTime.tryParse(t["dueDate"].toString());
-        if (utcDate != null) {
-          final localDate = utcDate.toLocal();
-          dueDateStr = DateFormat("EEE, d MMM yyyy 'at' h:mm a").format(localDate);
+          // Convert UTC dueDate → local for display
+          String dueDateStr = "No due date";
+          String relativeLabel = "";
+          if (t["dueDate"] != null && t["dueDate"].toString().isNotEmpty) {
+            final utcDate = DateTime.tryParse(t["dueDate"].toString());
+            if (utcDate != null) {
+              final localDate = utcDate.toLocal();
+              dueDateStr = DateFormat(
+                "EEE, d MMM yyyy 'at' h:mm a",
+              ).format(localDate);
 
-          // Label relative days for clarity
-          final todayLocal = DateTime(now.year, now.month, now.day);
-          final taskDay = DateTime(localDate.year, localDate.month, localDate.day);
-          final diff = taskDay.difference(todayLocal).inDays;
-          if (diff == 0) dueDateStr += " (TODAY)";
-          else if (diff == 1) dueDateStr += " (TOMORROW)";
-          else if (diff == -1) dueDateStr += " (YESTERDAY)";
-          else if (diff < -1) dueDateStr += " (OVERDUE)";
-        }
-      }
+              // Label relative days for clarity
+              final todayLocal = DateTime(now.year, now.month, now.day);
+              final taskDay = DateTime(
+                localDate.year,
+                localDate.month,
+                localDate.day,
+              );
+              final diff = taskDay.difference(todayLocal).inDays;
+              if (diff == 0)
+                relativeLabel = "TODAY";
+              else if (diff == 1)
+                relativeLabel = "TOMORROW";
+              else if (diff == -1)
+                relativeLabel = "YESTERDAY, OVERDUE";
+              else if (diff < -1)
+                relativeLabel = "OVERDUE by ${-diff} days";
+            }
+          }
 
           final notesPart = notes.isNotEmpty ? " | notes: $notes" : "";
-          return "- [$status] $title | due: $dueDateStr | priority: $priority$notesPart";
+          final starPart = isImportant ? " | starred" : "";
+          final relPart = relativeLabel.isNotEmpty ? " ($relativeLabel)" : "";
+          return "- Title: $title | status: $status | due: $dueDateStr$relPart | priority: $priority$starPart$notesPart";
         })
         .join("\n");
   }

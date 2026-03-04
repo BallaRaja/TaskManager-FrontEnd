@@ -67,18 +67,24 @@ class _CalendarTaskDetailSheetState extends State<_CalendarTaskDetailSheet> {
   Future<void> _toggleComplete() async {
     if (_toggling) return;
     setState(() => _toggling = true);
-    
-    final calController = Provider.of<CalendarController>(context, listen: false);
-    final tasksController = Provider.of<TasksController>(context, listen: false);
-    
+
+    final calController = Provider.of<CalendarController>(
+      context,
+      listen: false,
+    );
+    final tasksController = Provider.of<TasksController>(
+      context,
+      listen: false,
+    );
+
     final newStatus = _task['status'] == 'completed' ? 'pending' : 'completed';
     final taskId = _task['_id'].toString();
-    
+
     // Optimistic update
     final updatedTask = Map<String, dynamic>.from(_task);
     updatedTask['status'] = newStatus;
-    updatedTask['completedAt'] = newStatus == 'completed' 
-        ? DateTime.now().toUtc().toIso8601String() 
+    updatedTask['completedAt'] = newStatus == 'completed'
+        ? DateTime.now().toUtc().toIso8601String()
         : null;
 
     try {
@@ -86,12 +92,12 @@ class _CalendarTaskDetailSheetState extends State<_CalendarTaskDetailSheet> {
         "status": newStatus,
         "completedAt": updatedTask['completedAt'],
       });
-      
+
       if (result != null) {
         // Sync both controllers
         calController.upsertTaskLocal(result);
         // TasksController.updateTask already updates its local list
-        
+
         if (mounted) {
           setState(() {
             _task = Map<String, dynamic>.from(result);
@@ -107,9 +113,9 @@ class _CalendarTaskDetailSheetState extends State<_CalendarTaskDetailSheet> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Network error")),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Network error")));
       }
     } finally {
       if (mounted) setState(() => _toggling = false);
@@ -165,29 +171,13 @@ class _CalendarTaskDetailSheetState extends State<_CalendarTaskDetailSheet> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Complete toggle button
-                  GestureDetector(
-                    onTap: _toggleComplete,
-                    child: _toggling
-                        ? const SizedBox(
-                            width: 28,
-                            height: 28,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: Colors.white,
-                            ),
-                          )
-                        : AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 250),
-                            child: Icon(
-                              _isCompleted
-                                  ? Icons.check_circle_rounded
-                                  : Icons.radio_button_unchecked_rounded,
-                              key: ValueKey(_isCompleted),
-                              color: Colors.white,
-                              size: 28,
-                            ),
-                          ),
+                  // Status icon (read-only)
+                  Icon(
+                    _isCompleted
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: Colors.white,
+                    size: 28,
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -292,36 +282,6 @@ class _CalendarTaskDetailSheetState extends State<_CalendarTaskDetailSheet> {
                     ),
 
                   const SizedBox(height: 20),
-
-                  // Toggle complete button
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: _isCompleted
-                            ? Colors.grey[600]
-                            : Colors.purple,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      onPressed: _toggling ? null : _toggleComplete,
-                      icon: Icon(
-                        _isCompleted
-                            ? Icons.undo_rounded
-                            : Icons.check_circle_outline_rounded,
-                        size: 20,
-                      ),
-                      label: Text(
-                        _isCompleted ? 'Mark as Pending' : 'Mark as Complete',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
