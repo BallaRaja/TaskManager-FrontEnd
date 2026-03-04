@@ -300,6 +300,7 @@ class TaskItem extends StatelessWidget {
         (dueText?.contains("overdue") == true);
     final bool isArchived = task["isArchived"] == true;
     final bool isImportant = task["priority"] == "high";
+    final bool isOffline = task["_offline"] == true;
     return Dismissible(
       key: Key(task["_id"].toString()),
       background: ClipRRect(
@@ -534,6 +535,19 @@ class TaskItem extends StatelessWidget {
                   ],
                 ),
               ),
+              // OFFLINE INDICATOR
+              if (isOffline)
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Tooltip(
+                    message: 'Pending sync',
+                    child: Icon(
+                      Icons.cloud_off_rounded,
+                      size: 18,
+                      color: Colors.orange[400],
+                    ),
+                  ),
+                ),
               // STAR / IMPORTANT BUTTON
               IconButton(
                 icon: Icon(
