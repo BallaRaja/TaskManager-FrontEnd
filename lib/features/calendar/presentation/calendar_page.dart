@@ -200,94 +200,91 @@ class _CalendarPageState extends State<CalendarPage> {
   Widget build(BuildContext context) {
     final controller = context.watch<CalendarController>();
     if (controller.isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
-            appBar: AppBar(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              leading: IconButton(
-                icon: const Icon(Icons.menu),
-                onPressed: () => _openSidePanel(context),
-              ),
-              title: Text(
-                "Calendar • ${_titles[_currentIndex]}",
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                ),
-              ),
-              centerTitle: true,
-              actions: [
-                Padding(
-                  padding: const EdgeInsets.only(right: 16),
-                  child: GestureDetector(
-                    onTap: () => _showProfileSheet(context),
-                    child: CircleAvatar(
-                      radius: 18,
-                      backgroundColor: Colors.grey[300],
-                      backgroundImage:
-                          controller.avatarUrl != null &&
-                              controller.avatarUrl!.isNotEmpty
-                          ? NetworkImage(controller.avatarUrl!)
-                          : null,
-                      onBackgroundImageError: (_, __) {
-                        if (controller.avatarUrl != null) {
-                          imageCache.evict(NetworkImage(controller.avatarUrl!));
-                        }
-                      },
-                      child:
-                          controller.avatarUrl == null ||
-                              controller.avatarUrl!.isEmpty
-                          ? const Icon(Icons.person, color: Colors.grey)
-                          : null,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            body: RefreshIndicator(
-              onRefresh: controller.refresh,
-              child: Column(
-                children: [
-                  // Indicator dots at the top
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(3, (index) {
-                        return AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          height: 8,
-                          width: _currentIndex == index ? 24 : 8,
-                          decoration: BoxDecoration(
-                            color: _currentIndex == index
-                                ? Colors.purple
-                                : Colors.grey[400],
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
-                  // Swipable views
-                  Expanded(
-                    child: PageView(
-                      controller: _pageController,
-                      onPageChanged: (index) {
-                        setState(() => _currentIndex = index);
-                      },
-                      children: _views,
-                    ),
-                  ),
-                ],
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () => _openSidePanel(context),
+        ),
+        title: Text(
+          "Calendar • ${_titles[_currentIndex]}",
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+        ),
+        centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: GestureDetector(
+              onTap: () => _showProfileSheet(context),
+              child: CircleAvatar(
+                radius: 18,
+                backgroundColor: Colors.grey[300],
+                backgroundImage:
+                    controller.avatarUrl != null &&
+                        controller.avatarUrl!.isNotEmpty
+                    ? NetworkImage(controller.avatarUrl!)
+                    : null,
+                onBackgroundImageError:
+                    controller.avatarUrl != null &&
+                        controller.avatarUrl!.isNotEmpty
+                    ? (_, __) {
+                        imageCache.evict(NetworkImage(controller.avatarUrl!));
+                      }
+                    : null,
+                child:
+                    controller.avatarUrl == null ||
+                        controller.avatarUrl!.isEmpty
+                    ? const Icon(Icons.person, color: Colors.grey)
+                    : null,
               ),
             ),
-            // Removed FAB completely as requested
-          );
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: controller.refresh,
+        child: Column(
+          children: [
+            // Indicator dots at the top
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(3, (index) {
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    height: 8,
+                    width: _currentIndex == index ? 24 : 8,
+                    decoration: BoxDecoration(
+                      color: _currentIndex == index
+                          ? Colors.purple
+                          : Colors.grey[400],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  );
+                }),
+              ),
+            ),
+            // Swipable views
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (index) {
+                  setState(() => _currentIndex = index);
+                },
+                children: _views,
+              ),
+            ),
+          ],
+        ),
+      ),
+      // Removed FAB completely as requested
+    );
   }
 }

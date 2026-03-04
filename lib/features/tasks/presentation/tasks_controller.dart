@@ -46,7 +46,6 @@ class TasksController extends ChangeNotifier {
       return;
     }
 
-    // Load persisted sort prefs before fetching (so _sortTaskLists uses them)
     await Future.wait([_loadListSortMode(), _loadCustomListOrder()]);
 
     await Future.wait([
@@ -72,29 +71,19 @@ class TasksController extends ChangeNotifier {
         final Map<String, dynamic> json = jsonDecode(response.body);
         final dynamic avatarUrl = json['data']?['profile']?['avatarUrl'];
 
-        print('🧪 [TasksController] Raw avatarUrl from backend: $avatarUrl');
-
-        // Handle different URL formats
         if (avatarUrl == null ||
             avatarUrl.toString().isEmpty ||
             avatarUrl.toString().contains('placeholder')) {
           _avatarUrl = null;
-          print(
-            '🧪 [TasksController] No valid avatar (null/empty/placeholder)',
-          );
         } else if (avatarUrl.toString().startsWith('/')) {
           _avatarUrl = '${ApiConstants.backendUrl}$avatarUrl';
-          print('🧪 [TasksController] Converted relative URL to: $_avatarUrl');
         } else if (avatarUrl.toString().startsWith('http')) {
           _avatarUrl = avatarUrl.toString();
-          print('🧪 [TasksController] Using absolute URL: $_avatarUrl');
         } else {
           _avatarUrl = null;
-          print('🧪 [TasksController] Invalid URL format: $avatarUrl');
         }
       }
     } catch (e) {
-      print('🧪 [TasksController] Error fetching avatar: $e');
       _avatarUrl = null;
     } finally {
       _isLoadingAvatar = false;
@@ -137,9 +126,7 @@ class TasksController extends ChangeNotifier {
           _selectedListIndex = _taskLists.indexWhere(
             (list) => list['_id'] == created['_id'],
           );
-          if (_selectedListIndex < 0) {
-            _selectedListIndex = 0;
-          }
+          if (_selectedListIndex < 0) _selectedListIndex = 0;
 
           notifyListeners();
         } else {
@@ -201,7 +188,9 @@ class TasksController extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<Map<String, dynamic>?> createTask(Map<String, dynamic> taskData) async {
+  Future<Map<String, dynamic>?> createTask(
+    Map<String, dynamic> taskData,
+  ) async {
     _token ??= await SessionManager.getToken();
     if (_token == null) return null;
 
@@ -271,6 +260,52 @@ class TasksController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  // ── NEW: Update task status (for Kanban drag & drop) ────────
+  Future<void> updateTaskStatus(String taskId, String newStatus) async {
+    _token ??= await SessionManager.getToken();
+    if (_token == null) return;
+
+    // 1. Optimistic local update — UI responds instantly
+    final idx = _tasks.indexWhere((t) => t['_id']?.toString() == taskId);
+    if (idx == -1) return;
+
+    final previousStatus = _tasks[idx]['status'];
+    _tasks[idx] = Map<String, dynamic>.from(_tasks[idx])
+      ..['status'] = newStatus;
+    notifyListeners();
+
+    // 2. Send PATCH to backend
+    try {
+      final response = await http.patch(
+        Uri.parse('${ApiConstants.backendUrl}/api/tasks/$taskId/status'),
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'status': newStatus}),
+      );
+
+      if (response.statusCode != 200) {
+        // Revert on failure
+        _tasks[idx] = Map<String, dynamic>.from(_tasks[idx])
+          ..['status'] = previousStatus;
+        notifyListeners();
+        debugPrint(
+          '❌ [TasksController] updateTaskStatus failed: ${response.body}',
+        );
+      } else {
+        debugPrint('✅ [TasksController] Task $taskId → $newStatus');
+      }
+    } catch (e) {
+      // Revert on error
+      _tasks[idx] = Map<String, dynamic>.from(_tasks[idx])
+        ..['status'] = previousStatus;
+      notifyListeners();
+      debugPrint('❌ [TasksController] updateTaskStatus error: $e');
+    }
+  }
+  // ────────────────────────────────────────────────────────────
+
   void upsertTaskLocal(Map<String, dynamic> updatedTask) {
     final String? id = updatedTask['_id']?.toString();
     if (id == null) return;
@@ -309,7 +344,6 @@ class TasksController extends ChangeNotifier {
           final aIdx = _customListOrder.indexOf(aId);
           final bIdx = _customListOrder.indexOf(bId);
           if (aIdx == -1 && bIdx == -1) {
-            // Both not in custom order yet → sort by createdAt desc
             final dateA =
                 DateTime.tryParse(a['createdAt']?.toString() ?? '') ??
                 DateTime.fromMillisecondsSinceEpoch(0);
@@ -324,8 +358,6 @@ class TasksController extends ChangeNotifier {
       }
     });
   }
-
-  // ── Sort-mode & order persistence ──────────────────────────
 
   Future<void> _loadListSortMode() async {
     final prefs = await SharedPreferences.getInstance();
@@ -366,9 +398,6 @@ class TasksController extends ChangeNotifier {
     }
   }
 
-  // ── Public ordering API ─────────────────────────────────────
-
-  /// Change sort mode for the lists panel.
   Future<void> setListSortMode(TaskListSortMode mode) async {
     _listSortMode = mode;
     await _saveListSortMode();
@@ -376,7 +405,6 @@ class TasksController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Drag-reorder non-default lists (indices into non-default slice).
   Future<void> reorderLists(int oldIndex, int newIndex) async {
     final nonDefault = _taskLists.where((l) => l['isDefault'] != true).toList();
     if (oldIndex < 0 ||
@@ -396,7 +424,6 @@ class TasksController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Returns [pending] tasks sorted by the stored custom order for [listId].
   List<Map<String, dynamic>> getOrderedPendingTasks(
     String listId,
     List<Map<String, dynamic>> pending,
@@ -409,11 +436,10 @@ class TasksController extends ChangeNotifier {
       final idx = remaining.indexWhere((t) => t['_id']?.toString() == id);
       if (idx != -1) result.add(remaining.removeAt(idx));
     }
-    result.addAll(remaining); // new tasks not yet in the order go last
+    result.addAll(remaining);
     return result;
   }
 
-  /// Persist a new task order after a drag.
   Future<void> reorderTasks(
     String listId,
     int oldIndex,

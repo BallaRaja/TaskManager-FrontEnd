@@ -1,4 +1,9 @@
 // lib/features/tasks/presentation/tasks_page.dart
+// ── CHANGES FROM ORIGINAL ──────────────────────────────────────
+// 1. Added _isKanbanView bool state
+// 2. Added List/Kanban toggle button in AppBar actions
+// 3. Switched body between existing list view and KanbanBoard()
+// ──────────────────────────────────────────────────────────────
 import 'dart:async';
 import 'package:client/features/tasks/presentation/widgets/add_task_sheet.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +20,9 @@ import 'package:client/features/tasks/presentation/widgets/task_list_tab.dart';
 import 'package:client/features/tasks/presentation/widgets/task_item.dart';
 import 'package:client/features/ai/presentation/day_planner_page.dart';
 import 'package:client/features/ai/presentation/week_planner_page.dart';
+import 'package:client/features/focus/presentation/focus_page.dart';
+import 'package:client/features/focus/logic/focus_controller.dart';
+import 'package:client/features/tasks/presentation/kanban_board.dart';
 import 'widgets/completed_section.dart';
 
 class TasksPage extends StatefulWidget {
@@ -35,17 +43,14 @@ class _TasksPageState extends State<TasksPage> {
   late TaskViewType _viewType;
   late Timer _clockTimer;
   DateTime _now = DateTime.now();
+  bool _isKanbanView = false; // ← NEW: toggle between list and kanban
 
   @override
   void initState() {
     super.initState();
     _viewType = widget.initialViewType;
-
-    // 🔄 Update time every second (to show seconds)
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() {
-        _now = DateTime.now();
-      });
+      setState(() => _now = DateTime.now());
     });
   }
 
@@ -55,9 +60,7 @@ class _TasksPageState extends State<TasksPage> {
     super.dispose();
   }
 
-  String get _formattedTime {
-    return DateFormat('hh:mm:ss a').format(_now);
-  }
+  String get _formattedTime => DateFormat('hh:mm:ss a').format(_now);
 
   void _showProfileSheet(BuildContext context) async {
     await showGeneralDialog(
@@ -79,7 +82,6 @@ class _TasksPageState extends State<TasksPage> {
       },
     );
 
-    // Refresh avatar after profile sheet closes
     if (context.mounted) {
       final controller = Provider.of<TasksController>(context, listen: false);
       await controller.refreshAvatar();
@@ -117,17 +119,13 @@ class _TasksPageState extends State<TasksPage> {
     );
   }
 
-  // ─────────────────────────────────────────────────────────
-  //  List options (long-press on a tab)
-  // ─────────────────────────────────────────────────────────
-
   void _showListOptions(
     BuildContext context,
     TasksController controller,
     int index,
     Map<String, dynamic> listData,
   ) {
-    if (listData['isDefault'] == true) return; // My Tasks ─ no options
+    if (listData['isDefault'] == true) return;
 
     final String listId = listData['_id'].toString();
     final String listTitle = listData['title']?.toString() ?? 'Untitled';
@@ -150,7 +148,6 @@ class _TasksPageState extends State<TasksPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Drag handle
             Container(
               width: 40,
               height: 4,
@@ -160,7 +157,6 @@ class _TasksPageState extends State<TasksPage> {
               ),
             ),
             const SizedBox(height: 20),
-            // List info chip
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
@@ -364,7 +360,6 @@ class _TasksPageState extends State<TasksPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Header ──
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 28, 20, 12),
                     child: Row(
@@ -394,7 +389,6 @@ class _TasksPageState extends State<TasksPage> {
                   ),
                   const Divider(height: 1),
                   const SizedBox(height: 12),
-                  // ── VIEWS section ──
                   const Padding(
                     padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
                     child: Text(
@@ -438,8 +432,25 @@ class _TasksPageState extends State<TasksPage> {
                       MaterialPageRoute(builder: (_) => const SummaryPage()),
                     );
                   }, false),
-
-                  // ── AI PLANNER section ──
+                  _panelTile(ctx, Icons.timer_outlined, 'Focus Mode', () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => MultiProvider(
+                          providers: [
+                            ChangeNotifierProvider(
+                              create: (_) => FocusController()..init(),
+                            ),
+                            ChangeNotifierProvider.value(
+                              value: context.read<TasksController>(),
+                            ),
+                          ],
+                          child: const FocusPage(),
+                        ),
+                      ),
+                    );
+                  }, false),
                   const SizedBox(height: 16),
                   const Divider(height: 1),
                   const SizedBox(height: 4),
@@ -455,48 +466,28 @@ class _TasksPageState extends State<TasksPage> {
                       ),
                     ),
                   ),
-                  _panelTile(
-                    ctx,
-                    Icons.today_rounded,
-                    'Day Planner',
-                    () {
-                      Navigator.pop(ctx);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const DayPlannerPage()),
-                      ).then((refreshed) {
-                        if (refreshed == true) {
-                          context
-                              .read<TasksController>()
-                              .refresh();
-                        }
-                      });
-                    },
-                    false,
-                  ),
-                  _panelTile(
-                    ctx,
-                    Icons.date_range_rounded,
-                    'Week Planner',
-                    () {
-                      Navigator.pop(ctx);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const WeekPlannerPage()),
-                      ).then((refreshed) {
-                        if (refreshed == true) {
-                          context
-                              .read<TasksController>()
-                              .refresh();
-                        }
-                      });
-                    },
-                    false,
-                  ),
-
-                  // ── MY LISTS + Logout section ──
+                  _panelTile(ctx, Icons.today_rounded, 'Day Planner', () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const DayPlannerPage()),
+                    ).then((refreshed) {
+                      if (refreshed == true)
+                        context.read<TasksController>().refresh();
+                    });
+                  }, false),
+                  _panelTile(ctx, Icons.date_range_rounded, 'Week Planner', () {
+                    Navigator.pop(ctx);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const WeekPlannerPage(),
+                      ),
+                    ).then((refreshed) {
+                      if (refreshed == true)
+                        context.read<TasksController>().refresh();
+                    });
+                  }, false),
                   ..._buildSidePanelLists(ctx, controller),
                 ],
               ),
@@ -514,7 +505,6 @@ class _TasksPageState extends State<TasksPage> {
     );
   }
 
-  /// Builds the MY LISTS section widgets for the side panel.
   List<Widget> _buildSidePanelLists(
     BuildContext ctx,
     TasksController controller,
@@ -635,9 +625,7 @@ class _TasksPageState extends State<TasksPage> {
                         ),
                         onTap: () {
                           Navigator.pop(ctx);
-                          setState(() {
-                            _viewType = TaskViewType.normal;
-                          });
+                          setState(() => _viewType = TaskViewType.normal);
                           controller.selectList(i);
                         },
                       ),
@@ -684,8 +672,6 @@ class _TasksPageState extends State<TasksPage> {
       ),
     ];
   }
-
-  // ── Sort Lists bottom sheet ────────────────────────────────────────
 
   void _showListSortSheet(BuildContext panelCtx, TasksController controller) {
     showModalBottomSheet(
@@ -827,8 +813,6 @@ class _TasksPageState extends State<TasksPage> {
     );
   }
 
-  // ── Drag-reorder lists sheet ────────────────────────────────────
-
   void _showReorderListsSheet(
     BuildContext panelCtx,
     TasksController controller,
@@ -845,11 +829,9 @@ class _TasksPageState extends State<TasksPage> {
         builder: (sheetCtx, scrollCtrl) {
           return StatefulBuilder(
             builder: (sheetCtx, setSheetState) {
-              // Re-read on every setState so the list reflects the latest order
               final nonDefault = controller.taskLists
                   .where((l) => l['isDefault'] != true)
                   .toList();
-
               return Container(
                 decoration: BoxDecoration(
                   color: Theme.of(panelCtx).scaffoldBackgroundColor,
@@ -859,7 +841,6 @@ class _TasksPageState extends State<TasksPage> {
                 ),
                 child: Column(
                   children: [
-                    // Handle + header
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                       child: Column(
@@ -909,7 +890,6 @@ class _TasksPageState extends State<TasksPage> {
                       ),
                     ),
                     const Divider(height: 1),
-                    // Reorderable list
                     Expanded(
                       child: ReorderableListView.builder(
                         scrollController: scrollCtrl,
@@ -986,6 +966,70 @@ class _TasksPageState extends State<TasksPage> {
     );
   }
 
+  // ── NEW: View toggle button ────────────────────────────────────
+  Widget _buildViewToggle() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF252340) : Colors.grey.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _toggleButton(
+            icon: Icons.list_rounded,
+            label: 'List',
+            active: !_isKanbanView,
+            onTap: () => setState(() => _isKanbanView = false),
+          ),
+          _toggleButton(
+            icon: Icons.view_kanban_rounded,
+            label: 'Kanban',
+            active: _isKanbanView,
+            onTap: () => setState(() => _isKanbanView = true),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _toggleButton({
+    required IconData icon,
+    required String label,
+    required bool active,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: active ? Colors.purple : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: active ? Colors.white : Colors.grey),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: active ? Colors.white : Colors.grey,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<TasksController>();
@@ -993,9 +1037,8 @@ class _TasksPageState extends State<TasksPage> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // === FILTERING LOGIC ===
     List<Map<String, dynamic>> displayedTasks = controller.tasks;
-    Map<String, dynamic>? activeList; // non-null only for custom lists
+    Map<String, dynamic>? activeList;
     String? currentListId;
     bool isDefaultList = false;
 
@@ -1013,7 +1056,6 @@ class _TasksPageState extends State<TasksPage> {
               )
               .toList();
         } else {
-          // Default "My Tasks" list → show only tasks due today (not archived)
           isDefaultList = true;
           final now = DateTime.now();
           final today = DateTime(now.year, now.month, now.day);
@@ -1043,13 +1085,10 @@ class _TasksPageState extends State<TasksPage> {
     final pending = displayedTasks
         .where((t) => t["status"] == "pending")
         .toList();
-
-    // Apply custom task order when in normal view with a known list
     final orderedPending =
         (_viewType == TaskViewType.normal && currentListId != null)
         ? controller.getOrderedPendingTasks(currentListId, pending)
         : pending;
-
     final completed = displayedTasks
         .where((t) => t["status"] == "completed")
         .toList();
@@ -1057,7 +1096,9 @@ class _TasksPageState extends State<TasksPage> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(100),
+        preferredSize: Size.fromHeight(
+          _viewType == TaskViewType.normal ? 100 : 60,
+        ),
         child: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -1068,14 +1109,9 @@ class _TasksPageState extends State<TasksPage> {
                 )
               : IconButton(
                   icon: const Icon(Icons.arrow_back),
-                  onPressed: () {
-                    setState(() {
-                      _viewType = TaskViewType.normal;
-                    });
-                  },
+                  onPressed: () =>
+                      setState(() => _viewType = TaskViewType.normal),
                 ),
-
-          // 🧠 CUSTOM TITLE ROW (Title + Time)
           title: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1113,9 +1149,9 @@ class _TasksPageState extends State<TasksPage> {
               ),
             ],
           ),
-          centerTitle: true,
-
           actions: [
+            // ── NEW: List/Kanban toggle (only in normal view) ──
+            if (_viewType == TaskViewType.normal) _buildViewToggle(),
             Padding(
               padding: const EdgeInsets.only(right: 16.0),
               child: GestureDetector(
@@ -1128,21 +1164,21 @@ class _TasksPageState extends State<TasksPage> {
                           !controller.avatarUrl!.contains('placeholder')
                       ? NetworkImage(controller.avatarUrl!)
                       : null,
-                  child: controller.isLoadingAvatar
+                  child:
+                      (controller.avatarUrl != null &&
+                          !controller.avatarUrl!.contains('placeholder'))
+                      ? null
+                      : controller.isLoadingAvatar
                       ? const SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : (controller.avatarUrl == null ||
-                            controller.avatarUrl!.contains('placeholder'))
-                      ? const Icon(Icons.person, color: Colors.grey)
-                      : null,
+                      : const Icon(Icons.person, color: Colors.grey),
                 ),
               ),
             ),
           ],
-
           bottom: _viewType == TaskViewType.normal
               ? PreferredSize(
                   preferredSize: const Size.fromHeight(50),
@@ -1151,85 +1187,94 @@ class _TasksPageState extends State<TasksPage> {
               : null,
         ),
       ),
-      body: RefreshIndicator(
-        onRefresh: controller.refresh,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-          children: [
-            if (activeList != null)
-              _buildListHeader(
-                context,
-                activeList,
-                orderedPending.length,
-                completed.length,
-              ),
-            // "Today" empty state
-            if (isDefaultList && orderedPending.isEmpty && completed.isEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 60),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.wb_sunny_outlined,
-                      size: 64,
-                      color: Colors.grey[300],
+
+      // ── BODY: switch between list and kanban ──────────────────
+      body: _viewType == TaskViewType.normal && _isKanbanView
+          ? const KanbanBoard() // ← Kanban view
+          : RefreshIndicator(
+              // ← Original list view
+              onRefresh: controller.refresh,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                children: [
+                  if (activeList != null)
+                    _buildListHeader(
+                      context,
+                      activeList,
+                      orderedPending.length,
+                      completed.length,
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No tasks due today',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[500],
+                  if (isDefaultList &&
+                      orderedPending.isEmpty &&
+                      completed.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 60),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.wb_sunny_outlined,
+                            size: 64,
+                            color: Colors.grey[300],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No tasks due today',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Enjoy your day or add a task with a due date set to today.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[400],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Enjoy your day or add a task with a due date set to today.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, color: Colors.grey[400]),
+                  ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    buildDefaultDragHandles: false,
+                    proxyDecorator: (child, index, animation) => Material(
+                      elevation: 6,
+                      borderRadius: BorderRadius.circular(16),
+                      shadowColor: Colors.purple.withOpacity(0.25),
+                      child: child,
                     ),
-                  ],
-                ),
+                    itemCount: orderedPending.length,
+                    itemBuilder: (_, i) {
+                      final task = orderedPending[i];
+                      return ReorderableDelayedDragStartListener(
+                        key: ValueKey(task['_id']),
+                        index: i,
+                        child: TaskItem(task: task, isCompleted: false),
+                      );
+                    },
+                    onReorder: (oldIdx, newIdx) {
+                      if (newIdx > oldIdx) newIdx--;
+                      if (currentListId != null) {
+                        controller.reorderTasks(
+                          currentListId,
+                          oldIdx,
+                          newIdx,
+                          orderedPending,
+                        );
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 32),
+                  CompletedSection(completedTasks: completed),
+                  const SizedBox(height: 40),
+                ],
               ),
-            // Reorderable pending tasks (long-press to drag)
-            ReorderableListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              buildDefaultDragHandles: false,
-              proxyDecorator: (child, index, animation) => Material(
-                elevation: 6,
-                borderRadius: BorderRadius.circular(16),
-                shadowColor: Colors.purple.withOpacity(0.25),
-                child: child,
-              ),
-              itemCount: orderedPending.length,
-              itemBuilder: (_, i) {
-                final task = orderedPending[i];
-                return ReorderableDelayedDragStartListener(
-                  key: ValueKey(task['_id']),
-                  index: i,
-                  child: TaskItem(task: task, isCompleted: false),
-                );
-              },
-              onReorder: (oldIdx, newIdx) {
-                if (newIdx > oldIdx) newIdx--;
-                if (currentListId != null) {
-                  controller.reorderTasks(
-                    currentListId,
-                    oldIdx,
-                    newIdx,
-                    orderedPending,
-                  );
-                }
-              },
             ),
-            const SizedBox(height: 32),
-            CompletedSection(completedTasks: completed),
-            const SizedBox(height: 40),
-          ],
-        ),
-      ),
+
       floatingActionButton: _viewType == TaskViewType.normal
           ? FloatingActionButton(
               shape: const CircleBorder(),
@@ -1240,10 +1285,6 @@ class _TasksPageState extends State<TasksPage> {
           : null,
     );
   }
-
-  // ─────────────────────────────────────────────────────────
-  //  List name header (shown at the top of the task list for custom lists)
-  // ─────────────────────────────────────────────────────────
 
   Widget _buildListHeader(
     BuildContext context,

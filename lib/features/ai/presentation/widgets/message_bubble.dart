@@ -33,15 +33,19 @@ class MessageBubble extends StatelessWidget {
         spans.add(TextSpan(text: text.substring(lastEnd, match.start)));
       }
       if (match.group(1) != null) {
-        spans.add(TextSpan(
-          text: match.group(1),
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ));
+        spans.add(
+          TextSpan(
+            text: match.group(1),
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        );
       } else if (match.group(2) != null) {
-        spans.add(TextSpan(
-          text: match.group(2),
-          style: const TextStyle(fontStyle: FontStyle.italic),
-        ));
+        spans.add(
+          TextSpan(
+            text: match.group(2),
+            style: const TextStyle(fontStyle: FontStyle.italic),
+          ),
+        );
       }
       lastEnd = match.end;
     }
@@ -64,12 +68,14 @@ class MessageBubble extends StatelessWidget {
 
       // Horizontal rule
       if (trimmed == '---' || trimmed == '***') {
-        children.add(const WidgetSpan(
-          child: Padding(
-            padding: EdgeInsets.symmetric(vertical: 4),
-            child: Divider(height: 1),
+        children.add(
+          const WidgetSpan(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Divider(height: 1),
+            ),
           ),
-        ));
+        );
         continue;
       }
 
@@ -109,24 +115,25 @@ class MessageBubble extends StatelessWidget {
     final assistantTextColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
 
     return Column(
-      crossAxisAlignment:
-          isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: isUser
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
         // ── Row: avatar (assistant only) + bubble ──────────────────
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisAlignment:
-                isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+            mainAxisAlignment: isUser
+                ? MainAxisAlignment.end
+                : MainAxisAlignment.start,
             children: [
               // Avatar shown only for assistant messages
               if (!isUser) ...[
                 CircleAvatar(
                   radius: 18,
                   backgroundColor: Colors.transparent,
-                  backgroundImage:
-                      const AssetImage('assets/AiProfile.png'),
+                  backgroundImage: const AssetImage('assets/AiProfile.png'),
                 ),
                 const SizedBox(width: 8),
               ],
@@ -165,7 +172,7 @@ class MessageBubble extends StatelessWidget {
               ),
 
               // User avatar (right side)
-              if (isUser) ...[  
+              if (isUser) ...[
                 const SizedBox(width: 8),
                 CircleAvatar(
                   radius: 18,
@@ -173,11 +180,11 @@ class MessageBubble extends StatelessWidget {
                   backgroundImage: (userAvatarUrl != null)
                       ? NetworkImage(userAvatarUrl!) as ImageProvider
                       : null,
-                  onBackgroundImageError: (_, __) {
-                    if (userAvatarUrl != null) {
-                      imageCache.evict(NetworkImage(userAvatarUrl!));
-                    }
-                  },
+                  onBackgroundImageError: userAvatarUrl != null
+                      ? (_, __) {
+                          imageCache.evict(NetworkImage(userAvatarUrl!));
+                        }
+                      : null,
                   child: userAvatarUrl == null
                       ? const Icon(Icons.person, size: 20, color: Colors.white)
                       : null,

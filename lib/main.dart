@@ -1,12 +1,10 @@
 // lib/main.dart
 import 'dart:io' show Platform;
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
 import 'core/utils/session_manager.dart';
-import 'core/services/notification_service.dart'; // ← Local notification fallback
-import 'core/services/fcm_service.dart'; // ← Real server-sent push notifications
+import 'core/services/notification_service.dart';
 import 'package:client/features/auth/data/auth_api.dart';
 import 'package:client/features/auth/presentation/login_page.dart';
 import 'package:client/features/tasks/presentation/tasks_page.dart';
@@ -19,17 +17,12 @@ import 'package:provider/provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 🔥 Initialize Firebase (required before using FCM)
-  await Firebase.initializeApp();
-
   if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-    // Initialize FCM service — real server-sent push notifications
-    await FcmService.instance.init();
-
-    // Keep local notifications as a fallback channel
     await NotificationService().init();
   } else {
-    debugPrint("🖥️ Desktop/Web — skipping mobile notification initialization");
+    debugPrint(
+      "🖥️ Desktop/Web platform detected — skipping notification initialization",
+    );
   }
 
   runApp(const MyApp());
@@ -88,7 +81,6 @@ class _MyAppState extends State<MyApp> {
       if (result != null && result["valid"] == true) {
         final userId = result["userId"].toString();
 
-        // Save complete session
         await SessionManager.saveFullSession(
           token,
           await SessionManager.getEmail() ?? "",
@@ -97,9 +89,7 @@ class _MyAppState extends State<MyApp> {
 
         debugPrint("Valid session → Loading MainAppShell for user: $userId");
 
-        // Register FCM token with backend so server can send real push notifications
         if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-          await FcmService.instance.registerTokenWithBackend();
           await NotificationService().scheduleAllNotifications();
         }
 
@@ -118,10 +108,6 @@ class _MyAppState extends State<MyApp> {
         debugPrint(
           "Using cached session after verify failure for user: $savedUserId",
         );
-        // Still register FCM token for offline-resumed sessions
-        if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-          await FcmService.instance.registerTokenWithBackend();
-        }
         return MainAppShell(
           userId: savedUserId,
           onThemeChanged: _onThemeChanged,
@@ -133,9 +119,6 @@ class _MyAppState extends State<MyApp> {
       debugPrint(
         "Verify unavailable → keeping cached session for user: $savedUserId",
       );
-      if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-        await FcmService.instance.registerTokenWithBackend();
-      }
       return MainAppShell(userId: savedUserId, onThemeChanged: _onThemeChanged);
     }
 
@@ -164,7 +147,6 @@ class _MyAppState extends State<MyApp> {
             return snapshot.data!;
           }
 
-          // Fallback error screen
           return const Scaffold(
             body: Center(
               child: Text(
@@ -194,7 +176,7 @@ class MainAppShell extends StatefulWidget {
 }
 
 class _MainAppShellState extends State<MainAppShell> {
-  int _selectedIndex = 0; // Start on Tasks tab
+  int _selectedIndex = 0;
 
   late final List<Widget> _pages = [
     TasksPage(onThemeChanged: widget.onThemeChanged),
@@ -207,7 +189,6 @@ class _MainAppShellState extends State<MainAppShell> {
       _selectedIndex = index;
     });
 
-    // Refresh notifications when switching to relevant tabs
     if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
       if (index == 0 || index == 2) {
         NotificationService().scheduleAllNotifications();
