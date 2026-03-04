@@ -31,11 +31,7 @@ class CalendarTaskTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1C1B2E) : Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isCompleted
-                ? Colors.transparent
-                : Colors.grey.withOpacity(0.1),
-          ),
+          border: Border.all(color: Colors.grey.withOpacity(0.1)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
@@ -51,11 +47,7 @@ class CalendarTaskTile extends StatelessWidget {
               width: 4,
               height: 40,
               decoration: BoxDecoration(
-                color: isCompleted
-                    ? Colors.green
-                    : isImportant
-                    ? Colors.amber
-                    : Colors.purple,
+                color: isImportant ? Colors.amber : Colors.purple,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -68,13 +60,9 @@ class CalendarTaskTile extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
-                      decoration: isCompleted
-                          ? TextDecoration.lineThrough
-                          : null,
-                      color: isCompleted ? Colors.grey : null,
                     ),
                   ),
                   if (timeLabel != null || notes != null)
@@ -95,13 +83,6 @@ class CalendarTaskTile extends StatelessWidget {
               children: [
                 if (isImportant)
                   const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
-                const SizedBox(width: 4),
-                if (isCompleted)
-                  const Icon(
-                    Icons.check_circle_rounded,
-                    color: Colors.green,
-                    size: 18,
-                  ),
                 const SizedBox(width: 4),
                 Icon(
                   Icons.chevron_right_rounded,

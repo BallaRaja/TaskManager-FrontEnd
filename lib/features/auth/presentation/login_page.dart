@@ -210,10 +210,20 @@ class _LoginPageState extends State<LoginPage> {
                         color: Theme.of(context).colorScheme.primary,
                         size: 22,
                       ),
-                      enabledBorder: UnderlineInputBorder(
+                      filled: true,
+                      fillColor: isDark
+                          ? Colors.white.withOpacity(0.05)
+                          : Colors.grey.shade50,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide(color: borderColor),
                       ),
-                      focusedBorder: UnderlineInputBorder(
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide(
                           color: Theme.of(context).colorScheme.primary,
                           width: 2,
@@ -221,7 +231,7 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   // Password Field
                   TextField(
@@ -257,10 +267,20 @@ class _LoginPageState extends State<LoginPage> {
                           size: 22,
                         ),
                       ),
-                      enabledBorder: UnderlineInputBorder(
+                      filled: true,
+                      fillColor: isDark
+                          ? Colors.white.withOpacity(0.05)
+                          : Colors.grey.shade50,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide(color: borderColor),
                       ),
-                      focusedBorder: UnderlineInputBorder(
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide(
                           color: Theme.of(context).colorScheme.primary,
                           width: 2,

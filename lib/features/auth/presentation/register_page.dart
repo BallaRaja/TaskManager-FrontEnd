@@ -288,10 +288,20 @@ class _RegisterPageState extends State<RegisterPage> {
                         color: Theme.of(context).colorScheme.primary,
                         size: 22,
                       ),
-                      enabledBorder: UnderlineInputBorder(
+                      filled: true,
+                      fillColor: isDark
+                          ? Colors.white.withOpacity(0.05)
+                          : Colors.grey.shade50,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide(color: borderColor),
                       ),
-                      focusedBorder: UnderlineInputBorder(
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide(
                           color: Theme.of(context).colorScheme.primary,
                           width: 2,
@@ -299,7 +309,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   // Email Field
                   TextField(
@@ -322,10 +332,20 @@ class _RegisterPageState extends State<RegisterPage> {
                         color: Theme.of(context).colorScheme.primary,
                         size: 22,
                       ),
-                      enabledBorder: UnderlineInputBorder(
+                      filled: true,
+                      fillColor: isDark
+                          ? Colors.white.withOpacity(0.05)
+                          : Colors.grey.shade50,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide(color: borderColor),
                       ),
-                      focusedBorder: UnderlineInputBorder(
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide(
                           color: Theme.of(context).colorScheme.primary,
                           width: 2,
@@ -333,7 +353,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   // Password Field
                   TextField(
@@ -369,10 +389,20 @@ class _RegisterPageState extends State<RegisterPage> {
                           size: 22,
                         ),
                       ),
-                      enabledBorder: UnderlineInputBorder(
+                      filled: true,
+                      fillColor: isDark
+                          ? Colors.white.withOpacity(0.05)
+                          : Colors.grey.shade50,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide(color: borderColor),
                       ),
-                      focusedBorder: UnderlineInputBorder(
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide(
                           color: Theme.of(context).colorScheme.primary,
                           width: 2,
@@ -388,7 +418,9 @@ class _RegisterPageState extends State<RegisterPage> {
                       child: LinearProgressIndicator(
                         value: _passResult.strength,
                         backgroundColor: Colors.grey[200],
-                        valueColor: AlwaysStoppedAnimation<Color>(strengthColor),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          strengthColor,
+                        ),
                         minHeight: 4,
                       ),
                     ),
@@ -397,10 +429,19 @@ class _RegisterPageState extends State<RegisterPage> {
                       spacing: 16,
                       children: [
                         _buildRequirement("8+ chars", _passResult.hasMinLength),
-                        _buildRequirement("Uppercase", _passResult.hasUppercase),
-                        _buildRequirement("Lowercase", _passResult.hasLowercase),
+                        _buildRequirement(
+                          "Uppercase",
+                          _passResult.hasUppercase,
+                        ),
+                        _buildRequirement(
+                          "Lowercase",
+                          _passResult.hasLowercase,
+                        ),
                         _buildRequirement("Number", _passResult.hasDigit),
-                        _buildRequirement("Special", _passResult.hasSpecialChar),
+                        _buildRequirement(
+                          "Special",
+                          _passResult.hasSpecialChar,
+                        ),
                       ],
                     ),
                   ],
@@ -443,10 +484,20 @@ class _RegisterPageState extends State<RegisterPage> {
                           size: 22,
                         ),
                       ),
-                      enabledBorder: UnderlineInputBorder(
+                      filled: true,
+                      fillColor: isDark
+                          ? Colors.white.withOpacity(0.05)
+                          : Colors.grey.shade50,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide(color: borderColor),
                       ),
-                      focusedBorder: UnderlineInputBorder(
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
                         borderSide: BorderSide(
                           color: Theme.of(context).colorScheme.primary,
                           width: 2,
