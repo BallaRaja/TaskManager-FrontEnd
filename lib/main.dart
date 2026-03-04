@@ -7,6 +7,7 @@ import 'core/theme/app_theme.dart';
 import 'core/utils/session_manager.dart';
 import 'core/services/notification_service.dart'; // ← Local notification fallback
 import 'core/services/fcm_service.dart'; // ← Real server-sent push notifications
+import 'core/services/offline_sync_service.dart'; // ← Offline task queue + auto-sync
 import 'package:client/features/auth/data/auth_api.dart';
 import 'package:client/features/auth/presentation/login_page.dart';
 import 'package:client/features/tasks/presentation/tasks_page.dart';
@@ -20,7 +21,12 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 🔥 Initialize Firebase (required before using FCM)
-  await Firebase.initializeApp();
+  // Wrapped in try-catch — Firebase isn't available on Linux desktop
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('⚠️ Firebase init failed (expected on desktop): $e');
+  }
 
   if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
     // Initialize FCM service — real server-sent push notifications
@@ -195,12 +201,44 @@ class MainAppShell extends StatefulWidget {
 
 class _MainAppShellState extends State<MainAppShell> {
   int _selectedIndex = 0; // Start on Tasks tab
+  final OfflineSyncService _offlineSync = OfflineSyncService();
 
   late final List<Widget> _pages = [
     TasksPage(onThemeChanged: widget.onThemeChanged),
     const AIChatPage(),
     CalendarPage(onThemeChanged: widget.onThemeChanged),
   ];
+
+  @override
+  void dispose() {
+    _offlineSync.removeListener(_onSyncChanged);
+    _offlineSync.dispose_();
+    super.dispose();
+  }
+
+  void _onSyncChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// Called once after the first build, when Provider is available.
+  void _initOfflineSync(BuildContext ctx) {
+    final tasksCtrl = Provider.of<TasksController>(ctx, listen: false);
+    final calCtrl = Provider.of<CalendarController>(ctx, listen: false);
+
+    _offlineSync.onTaskSynced = (tempId, serverTask) {
+      tasksCtrl.replaceTempTask(tempId, serverTask);
+      calCtrl.upsertTaskLocal(serverTask);
+    };
+
+    _offlineSync.onSyncComplete = () {
+      // Full refresh to reconcile any ordering / counts
+      tasksCtrl.refresh();
+      calCtrl.refresh();
+    };
+
+    _offlineSync.addListener(_onSyncChanged);
+    _offlineSync.init();
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -219,30 +257,126 @@ class _MainAppShellState extends State<MainAppShell> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => TasksController()..init()),
-        ChangeNotifierProvider(create: (_) => CalendarController()..init()),
+        ChangeNotifierProvider(
+          create: (_) => TasksController()..init(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => CalendarController()..init(),
+        ),
       ],
-      child: Scaffold(
-        body: IndexedStack(index: _selectedIndex, children: _pages),
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: _onItemTapped,
-          selectedItemColor: Theme.of(context).primaryColor,
-          unselectedItemColor: Colors.grey,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.checklist),
-              label: 'Tasks',
+      child: Builder(
+        builder: (innerCtx) {
+          // One-time wiring after providers are available
+          if (_offlineSync.onTaskSynced == null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _initOfflineSync(innerCtx);
+            });
+          }
+
+          return Scaffold(
+            body: Column(
+              children: [
+                // ── Offline / syncing banner ──
+                if (!_offlineSync.isOnline || _offlineSync.isSyncing)
+                  _OfflineBanner(
+                    isOnline: _offlineSync.isOnline,
+                    isSyncing: _offlineSync.isSyncing,
+                    pendingCount: _offlineSync.pendingCount,
+                  ),
+                Expanded(
+                  child: IndexedStack(
+                      index: _selectedIndex, children: _pages),
+                ),
+              ],
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.auto_awesome),
-              label: 'AI',
+            bottomNavigationBar: BottomNavigationBar(
+              currentIndex: _selectedIndex,
+              onTap: _onItemTapped,
+              selectedItemColor: Theme.of(context).primaryColor,
+              unselectedItemColor: Colors.grey,
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.checklist),
+                  label: 'Tasks',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.auto_awesome),
+                  label: 'AI',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.calendar_today),
+                  label: 'Calendar',
+                ),
+              ],
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_today),
-              label: 'Calendar',
-            ),
-          ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// A small banner shown at the top when the device is offline or syncing.
+class _OfflineBanner extends StatelessWidget {
+  final bool isOnline;
+  final bool isSyncing;
+  final int pendingCount;
+
+  const _OfflineBanner({
+    required this.isOnline,
+    required this.isSyncing,
+    required this.pendingCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bg;
+    final String text;
+    final IconData icon;
+
+    if (isSyncing) {
+      bg = Colors.blue;
+      text = 'Syncing $pendingCount task${pendingCount == 1 ? '' : 's'}…';
+      icon = Icons.sync_rounded;
+    } else {
+      bg = Colors.orange;
+      text = pendingCount > 0
+          ? 'You\'re offline · $pendingCount task${pendingCount == 1 ? '' : 's'} pending'
+          : 'You\'re offline';
+      icon = Icons.cloud_off_rounded;
+    }
+
+    return Material(
+      color: bg,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: Row(
+            children: [
+              Icon(icon, color: Colors.white, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (isSyncing)
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

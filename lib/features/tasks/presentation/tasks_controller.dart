@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/constants/api_constants.dart';
+import '../../../core/services/offline_sync_service.dart';
 import '../../../core/utils/session_manager.dart';
 
 enum TaskListSortMode { custom, az, za }
@@ -201,6 +202,12 @@ class TasksController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// Creates a task via API. If the network is unavailable the task is
+  /// queued offline and an optimistic placeholder (with a temporary `_id`
+  /// starting with `offline_`) is inserted into the local list.
+  ///
+  /// Returns the created / placeholder map, or `null` on unexpected failure.
+  /// Check `result['_offline'] == true` to know it was queued.
   Future<Map<String, dynamic>?> createTask(Map<String, dynamic> taskData) async {
     _token ??= await SessionManager.getToken();
     if (_token == null) return null;
@@ -223,8 +230,41 @@ class TasksController extends ChangeNotifier {
           return created;
         }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Network error — queue for later sync
+      return _queueTaskOffline(taskData);
+    }
     return null;
+  }
+
+  /// Queue a task body offline and insert an optimistic placeholder.
+  Future<Map<String, dynamic>> _queueTaskOffline(
+      Map<String, dynamic> taskData) async {
+    final tempId = await OfflineSyncService().enqueue(taskData);
+
+    // Build an optimistic local placeholder
+    final placeholder = {
+      ...taskData,
+      '_id': tempId,
+      '_offline': true,
+      'completed': false,
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+    upsertTaskLocal(placeholder);
+    return placeholder;
+  }
+
+  /// Called by OfflineSyncService after a queued task is successfully POSTed.
+  /// Replaces the optimistic placeholder with the real server object.
+  void replaceTempTask(String tempId, Map<String, dynamic> serverTask) {
+    final idx = _tasks.indexWhere((t) => t['_id']?.toString() == tempId);
+    if (idx != -1) {
+      _tasks[idx] = serverTask;
+    } else {
+      _tasks.insert(0, serverTask);
+    }
+    notifyListeners();
   }
 
   Future<Map<String, dynamic>?> updateTask(

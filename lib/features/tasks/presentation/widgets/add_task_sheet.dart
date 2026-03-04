@@ -530,16 +530,23 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
       if (!mounted) return;
 
       if (createdTask != null) {
+        final bool isOffline = createdTask['_offline'] == true;
+
         widget.calendarController.upsertTaskLocal(createdTask);
 
-        // Schedule 2-min reminder if task has a due date/time
-        if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+        // Schedule 2-min reminder if task has a due date/time (online only)
+        if (!isOffline && !kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
           await NotificationService().scheduleTaskReminder(createdTask);
         }
 
         // Close sheet first, then show success popup using the page context
         if (mounted) Navigator.pop(context);
-        _showTaskCreatedDialog(widget.pageContext, createdTask);
+
+        if (isOffline) {
+          _showOfflineQueuedDialog(widget.pageContext, createdTask);
+        } else {
+          _showTaskCreatedDialog(widget.pageContext, createdTask);
+        }
       } else {
         // ❌ FAILURE — keep sheet open, show error dialog
         _showErrorDialog(context, "Failed to create task. Please try again.");
@@ -698,6 +705,95 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
               ),
               child: const Text(
                 'Great!',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showOfflineQueuedDialog(
+    BuildContext ctx,
+    Map<String, dynamic> task,
+  ) {
+    final String title = task['title'] ?? 'Task';
+
+    showDialog(
+      context: ctx,
+      barrierDismissible: true,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.all(24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.cloud_off_rounded,
+                color: Colors.orange,
+                size: 40,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Saved Offline',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'You\'re offline. "$title" has been saved locally and will sync automatically when you\'re back online.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.sync_rounded,
+                      size: 16, color: Colors.orange),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Will sync when connected',
+                      style:
+                          TextStyle(fontSize: 12, color: Colors.orange[700]),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text(
+                'Got it',
                 style: TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
