@@ -1,4 +1,8 @@
 // lib/features/tasks/presentation/widgets/add_task_sheet.dart
+import 'dart:io';
+
+import 'package:client/core/services/notification_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:client/features/tasks/presentation/tasks_controller.dart';
@@ -686,95 +690,6 @@ class _AddTaskSheetState extends State<AddTaskSheet> {
                 ],
               ),
             ],
-          ],
-        ),
-        actions: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => Navigator.pop(dialogCtx),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: const Text(
-                'Got it',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showOfflineQueuedDialog(
-    BuildContext ctx,
-    Map<String, dynamic> task,
-  ) {
-    final String title = task['title'] ?? 'Task';
-
-    showDialog(
-      context: ctx,
-      barrierDismissible: true,
-      builder: (dialogCtx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        contentPadding: const EdgeInsets.all(24),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.cloud_off_rounded,
-                color: Colors.orange,
-                size: 40,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Saved Offline',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'You\'re offline. "$title" has been saved locally and will sync automatically when you\'re back online.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.sync_rounded,
-                      size: 16, color: Colors.orange),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Will sync when connected',
-                      style:
-                          TextStyle(fontSize: 12, color: Colors.orange[700]),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
         actions: [
